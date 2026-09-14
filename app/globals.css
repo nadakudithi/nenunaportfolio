@@ -22,7 +22,8 @@ button { background:none; border:0; padding:0; }
 .arrow-left { transform:rotate(180deg); margin:0; }
 .arrow-down { transform:rotate(90deg); margin:0; }
 
-.nav-rail { position:fixed; z-index:120; left:28px; top:50%; width:5px; height:8vh; transform:translateY(-50%); border-radius:999px; cursor:pointer; background:linear-gradient(90deg,#3f4148 0%,#e1e0da 24%,#747781 48%,#f1efe8 70%,#50535d 100%); box-shadow:0 0 0 1px rgba(8,8,10,.28),0 0 15px rgba(110,127,224,.12); transition:height .48s cubic-bezier(.2,.8,.2,1),width .48s cubic-bezier(.2,.8,.2,1),left .45s cubic-bezier(.2,.8,.2,1),top .45s cubic-bezier(.2,.8,.2,1),transform .45s cubic-bezier(.2,.8,.2,1); }
+.nav-rail { position:fixed; z-index:120; left:28px; top:50%; width:5px; height:8vh; transform:translateY(-50%); border-radius:999px; cursor:pointer; background:linear-gradient(90deg,#3f4148 0%,#e1e0da 24%,#747781 48%,#f1efe8 70%,#50535d 100%); box-shadow:0 0 0 1px rgba(8,8,10,.28),0 0 15px rgba(110,127,224,.12); transition:height .48s cubic-bezier(.2,.8,.2,1),width .48s cubic-bezier(.2,.8,.2,1),left .45s cubic-bezier(.2,.8,.2,1),top .45s cubic-bezier(.2,.8,.2,1),transform .45s cubic-bezier(.2,.8,.2,1),opacity .18s ease; }
+.nav-rail.is-scene-handoff { opacity:0; pointer-events:none; }
 .nav-rail.is-engaged { height:44vh; }
 .nav-rail:focus-within { height:44vh; }
 .nav-rail.is-gallery { left:50%; top:24px; width:8vw; height:5px; transform:translateX(-50%); background:linear-gradient(180deg,#3f4148 0%,#e1e0da 24%,#747781 48%,#f1efe8 70%,#50535d 100%); }
@@ -118,6 +119,7 @@ button { background:none; border:0; padding:0; }
 
 .gallery-scroll { height:auto; background:#fff; }
 .gallery-sticky { height:100vh; min-height:680px; position:relative; overflow:hidden; background:#fff; color:#101012; }
+.gallery-scroll.is-work-mode,.gallery-scroll.is-work-mode .gallery-sticky { background:#08080a; }
 .gallery-visual { position:absolute; z-index:2; inset:0; overflow:hidden; background:#fff; transform-origin:0 0; }
 .gallery-phone-reveal { position:absolute; z-index:1; inset:0; overflow:hidden; background:#08080a; opacity:0; }
 .gallery-phone-reveal>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; }

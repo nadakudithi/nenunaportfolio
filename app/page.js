@@ -121,7 +121,7 @@ function NavRail() {
     const updateRailMode = (scrollY) => {
       const gallery = ScrollTrigger.getById("gallery-scrub");
       const workStart = gallery ? gallery.start + (gallery.end - gallery.start) * .74 : 0;
-      const nextHorizontal = Boolean(gallery && scrollY >= gallery.start && scrollY < workStart);
+      const nextHorizontal = Boolean(gallery && scrollY >= gallery.start && scrollY < workStart - 4);
       if (nextHorizontal === horizontal) return;
       horizontal = nextHorizontal;
       rail.classList.toggle("is-gallery", horizontal);
@@ -243,6 +243,25 @@ function NavRail() {
         rail.classList.remove("is-engaged");
       }
     };
+    const suspendForSceneHandoff = () => rail.classList.add("is-scene-handoff");
+    const resumeAfterSceneHandoff = (event) => {
+      const destination = event.detail?.section;
+
+      if (destination === "work") {
+        // Gallery's trigger can update while the rail is hidden during the
+        // reverse handoff. Work always owns the original vertical-left rail.
+        horizontal = false;
+        rail.classList.remove("is-gallery");
+        const workStop = positionsRef.current.find((section) => section.id === "work");
+        if (workStop) currentProgress = workStop.pos;
+        setHandlePosition(currentProgress);
+        updateActiveStop(currentProgress);
+      } else {
+        updateRailMode(window.scrollY);
+      }
+
+      rail.classList.remove("is-scene-handoff");
+    };
 
     handle.addEventListener("pointerdown", startDrag);
     handle.addEventListener("pointermove", updateDrag);
@@ -253,6 +272,8 @@ function NavRail() {
     rail.addEventListener("pointerleave", disengage);
     rail.addEventListener("pointerdown", primeTouch);
     document.addEventListener("pointerdown", closeFromOutside);
+    window.addEventListener("work-about-handoff-start", suspendForSceneHandoff);
+    window.addEventListener("work-about-handoff-complete", resumeAfterSceneHandoff);
     const stopButtons = Array.from(rail.querySelectorAll(".nav-stop"));
     stopButtons.forEach((stop) => stop.addEventListener("click", clickStop));
 
@@ -293,6 +314,8 @@ function NavRail() {
       rail.removeEventListener("pointerleave", disengage);
       rail.removeEventListener("pointerdown", primeTouch);
       document.removeEventListener("pointerdown", closeFromOutside);
+      window.removeEventListener("work-about-handoff-start", suspendForSceneHandoff);
+      window.removeEventListener("work-about-handoff-complete", resumeAfterSceneHandoff);
       stopButtons.forEach((stop) => stop.removeEventListener("click", clickStop));
       jumpTween?.kill();
       progressTrigger?.kill();
@@ -694,12 +717,71 @@ function Gallery() {
     let landingOnIntro = false;
     let introLandingComplete = false;
     let introReleaseTimer;
+    let returnSettleTimer;
+    let returnPhoneClone;
+    let pausedReturnDiscs = [];
     let lastScrollIntent = 0;
     let lastScrollIntentAt = 0;
     let transitionLock;
     let projectObserver;
     let storyTimeline;
     let stateTimeline;
+    const setWorkMode = (active) => section.current?.classList.toggle("is-work-mode", active);
+    const resumeReturnDiscMotion = () => {
+      pausedReturnDiscs.forEach((disc) => disc.style.removeProperty("animation-play-state"));
+      pausedReturnDiscs = [];
+    };
+    const removeReturnPhoneClone = () => {
+      if (returnPhoneClone) {
+        gsap.killTweensOf(returnPhoneClone);
+        returnPhoneClone.remove();
+        returnPhoneClone = null;
+      }
+      resumeReturnDiscMotion();
+    };
+    const stageWorkReturn = () => {
+      returningFromAbout = true;
+      clearTimeout(returnSettleTimer);
+      removeReturnPhoneClone();
+      // Keep the real page-level Work labels out of the reverse transition.
+      // They are revealed only after the viewport has actually landed.
+      gsap.killTweensOf(".gallery-work-chrome");
+      gsap.set(".gallery-work-chrome", { opacity: 0, y: 0, pointerEvents: "none" });
+      pausedReturnDiscs = Array.from(phoneReveal.current.querySelectorAll(".work-disc .artwork"));
+      const frozenDiscTransforms = pausedReturnDiscs.map((disc) => getComputedStyle(disc).transform);
+      // Use layout dimensions: getBoundingClientRect() includes the 24% exit
+      // transform and would create a double-scaled return clone.
+      const realSceneWidth = phoneReveal.current.offsetWidth;
+      const realSceneHeight = phoneReveal.current.offsetHeight;
+      pausedReturnDiscs.forEach((disc) => { disc.style.animationPlayState = "paused"; });
+      returnPhoneClone = phoneReveal.current.cloneNode(true);
+      returnPhoneClone.classList.add("gallery-return-clone");
+      returnPhoneClone.setAttribute("aria-hidden", "true");
+      // The fixed clone carries only the phone/hand visual. External Work
+      // chrome is restored after the complete scene handoff, not inside it.
+      returnPhoneClone.querySelectorAll(".gallery-work-chrome").forEach((node) => node.remove());
+      returnPhoneClone.querySelectorAll(".work-disc .artwork").forEach((disc, index) => {
+        disc.style.animation = "none";
+        disc.style.transform = frozenDiscTransforms[index] || "none";
+      });
+      document.body.appendChild(returnPhoneClone);
+      gsap.set(returnPhoneClone, {
+        position: "fixed",
+        inset: 0,
+        // 100vw includes the scrollbar while the real sticky scene does not.
+        // Matching its measured box prevents a small horizontal/scale snap.
+        width: realSceneWidth,
+        height: realSceneHeight,
+        zIndex: 29,
+        pointerEvents: "none",
+        opacity: 1,
+        x: "31vw",
+        y: "-6vh",
+        scale: .24,
+        rotation: 8,
+        transformOrigin: "center center"
+      });
+    };
     const killGalleryMotion = () => {
       storyTimeline?.kill();
       stateTimeline?.kill();
@@ -715,6 +797,9 @@ function Gallery() {
       transitionLock?.disable();
       projectObserver?.disable();
       workLocked.current = false;
+      clearTimeout(returnSettleTimer);
+      removeReturnPhoneClone();
+      setWorkMode(false);
       gsap.set(visual.current, { opacity: 1, clearProps: "transform,borderRadius,backgroundColor,pointerEvents" });
       gsap.set(cassetteCanvas.current, { clearProps: "transform" });
       gsap.set(phoneReveal.current, { opacity: 0, clearProps: "transform" });
@@ -724,6 +809,7 @@ function Gallery() {
     const launchPhoneTransition = () => {
       if (transitioning) return;
       transitioning = true;
+      setWorkMode(true);
       transitionLock.enable();
       gsap.set(visual.current, { opacity: 1, pointerEvents: "auto" });
       gsap.set(phoneReveal.current, { opacity: 1 });
@@ -792,9 +878,14 @@ function Gallery() {
     const exitToAbout = () => {
       if (workLocked.current) return;
       workLocked.current = true;
+      setWorkMode(true);
+      window.dispatchEvent(new Event("work-about-handoff-start"));
       projectObserver.disable();
       window.dispatchEvent(new CustomEvent("show-life-outside", { detail: { fromWork: true } }));
       stateTimeline?.kill();
+      // A staggered Work-chrome entrance may still have delayed children.
+      // Cancel them before the exit so removed chrome cannot flash back in.
+      gsap.killTweensOf(".gallery-work-chrome");
       stateTimeline = gsap.timeline({
         defaults: { ease: "power3.inOut" },
         onComplete: () => {
@@ -803,6 +894,7 @@ function Gallery() {
         }
       })
         .to(".gallery-work-chrome", { opacity: 0, y: -16, pointerEvents: "none", duration: .35 }, 0)
+        .to(".about-stage", { opacity: 1, duration: .38, ease: "power2.out" }, .45)
         .to(phoneReveal.current, { x: "31vw", y: "-6vh", scale: .24, rotation: 8, duration: 1.05 }, 0)
         .to(window, { scrollTo: "#about", duration: 1.05 }, 0);
     };
@@ -819,6 +911,7 @@ function Gallery() {
           transitioning = false;
           workLocked.current = false;
           transitionLock.disable();
+          setWorkMode(false);
           gsap.set(phoneReveal.current, { opacity: 0, clearProps: "transform" });
           gsap.set(transitionUi.current, { opacity: 0, xPercent: 100 });
           gsap.set(visual.current, { clearProps: "transform,borderRadius,backgroundColor,pointerEvents" });
@@ -851,7 +944,7 @@ function Gallery() {
       }
     });
     projectObserver.disable();
-    const prepareWorkReturn = () => { returningFromAbout = true; };
+    const prepareWorkReturn = () => stageWorkReturn();
     const prepareIntroArrival = () => { arrivingFromIntro = true; };
     const finishIntroArrival = () => { arrivingFromIntro = false; };
     const openGalleryFromRail = () => resetTransition();
@@ -868,6 +961,12 @@ function Gallery() {
         railJumping = true;
       } else {
         returningFromAbout = false;
+        if (destination === "about" || destination === "contact") {
+          projectObserver.disable();
+          stateTimeline?.kill();
+          gsap.killTweensOf(".gallery-work-chrome");
+          gsap.set(".gallery-work-chrome", { opacity: 0, y: 0, pointerEvents: "none" });
+        }
       }
     };
     const releaseFromRailJump = () => { railJumping = false; };
@@ -878,26 +977,51 @@ function Gallery() {
       }
       workLocked.current = true;
       transitionLock.enable();
+      setWorkMode(true);
       gsap.set(visual.current, { opacity: 0, pointerEvents: "none" });
       gsap.set(cassetteCanvas.current, { xPercent: -110 });
-      gsap.set(phoneReveal.current, { opacity: 1 });
+      gsap.set(phoneReveal.current, { opacity: returnPhoneClone ? 0 : 1 });
       gsap.set(transitionUi.current, { opacity: 1, xPercent: 0 });
       stateTimeline?.kill();
+      const returningVisual = returnPhoneClone || phoneReveal.current;
+      const deferChromeReveal = Boolean(returnPhoneClone);
+      if (deferChromeReveal) {
+        gsap.killTweensOf(".gallery-work-chrome");
+        gsap.set(".gallery-work-chrome", { opacity: 0, y: 0, pointerEvents: "none" });
+      }
       stateTimeline = gsap.timeline({
         defaults: { ease: "power3.inOut" },
         onComplete: () => {
-          returningFromAbout = false;
+          gsap.set(phoneReveal.current, { opacity: 1, x: 0, y: 0, scale: 1, rotation: 0 });
+          removeReturnPhoneClone();
           workLocked.current = false;
           transitionLock.disable();
           projectObserver.enable();
+          window.dispatchEvent(new Event("gallery-work-return-complete"));
+          // Keep the return guard alive through ScrollTrigger's landing update;
+          // otherwise onEnterBack can reset the phone into Gallery mode.
+          clearTimeout(returnSettleTimer);
+          returnSettleTimer = setTimeout(() => { returningFromAbout = false; }, 180);
         }
       })
-        .to(phoneReveal.current, { x: 0, y: 0, scale: 1, rotation: 0, duration: 1.05 }, 0)
-        .to(".gallery-work-chrome", { opacity: 1, y: 0, pointerEvents: "auto", duration: .45, stagger: .06 }, .62);
+        .to(returningVisual, { x: 0, y: 0, scale: 1, rotation: 0, duration: 1.05 }, 0)
+        .to(phoneReveal.current, { x: 0, y: 0, scale: 1, rotation: 0, duration: 1.05 }, 0);
+      if (!deferChromeReveal) {
+        stateTimeline.to(".gallery-work-chrome", { opacity: 1, y: 0, pointerEvents: "auto", duration: .45, stagger: .06 }, .62);
+      }
+    };
+    const settleReturnedWorkChrome = (event) => {
+      if (event.detail?.section !== "work") return;
+      gsap.killTweensOf(".gallery-work-chrome");
+      gsap.fromTo(".gallery-work-chrome",
+        { opacity: 0, y: 10, pointerEvents: "none" },
+        { opacity: 1, y: 0, pointerEvents: "auto", duration: .34, stagger: .04, ease: "power2.out", overwrite: true }
+      );
     };
     const openWorkFromRail = () => resumeWork();
     window.addEventListener("prepare-gallery-work-return", prepareWorkReturn);
     window.addEventListener("resume-gallery-work", resumeWork);
+    window.addEventListener("work-about-handoff-complete", settleReturnedWorkChrome);
     window.addEventListener("intro-gallery-handoff-start", prepareIntroArrival);
     window.addEventListener("intro-gallery-handoff-ready", finishIntroArrival);
     window.addEventListener("nav-open-work", openWorkFromRail);
@@ -925,10 +1049,13 @@ function Gallery() {
           // Without this reset, a previously enabled Work observer can keep
           // consuming wheel input and make the cassette appear frozen.
           onEnter: () => {
-            if (!railJumping && !returningFromAbout) resetTransition();
+            if (!railJumping && !returningFromAbout && !section.current.classList.contains("is-work-mode")) resetTransition();
           },
           onEnterBack: () => {
-            if (!railJumping && !returningFromAbout) resetTransition();
+            // The About -> Work landing crosses this boundary too. In that
+            // case Work already owns the scene, so resetting here causes the
+            // restored chrome to appear for a frame and disappear again.
+            if (!railJumping && !returningFromAbout && !section.current.classList.contains("is-work-mode")) resetTransition();
           },
           onLeaveBack: () => {
             const isRealUpwardGesture = lastScrollIntent < 0 && performance.now() - lastScrollIntentAt < 500;
@@ -966,6 +1093,7 @@ function Gallery() {
     return () => {
       window.removeEventListener("prepare-gallery-work-return", prepareWorkReturn);
       window.removeEventListener("resume-gallery-work", resumeWork);
+      window.removeEventListener("work-about-handoff-complete", settleReturnedWorkChrome);
       window.removeEventListener("intro-gallery-handoff-start", prepareIntroArrival);
       window.removeEventListener("intro-gallery-handoff-ready", finishIntroArrival);
       window.removeEventListener("nav-open-work", openWorkFromRail);
@@ -973,8 +1101,11 @@ function Gallery() {
       window.removeEventListener("nav-rail-jump-start", holdForRailJump);
       window.removeEventListener("nav-rail-jump-ready", releaseFromRailJump);
       clearTimeout(introReleaseTimer);
+      clearTimeout(returnSettleTimer);
       window.clearTimeout(beamTimer.current);
       killGalleryMotion();
+      removeReturnPhoneClone();
+      setWorkMode(false);
       transitionLock.kill();
       intentObserver.kill();
       projectObserver.kill();
@@ -1167,6 +1298,11 @@ function About() {
     let settleTimer;
     let continuousArrivalPending = false;
     let continuousSceneWaiting = false;
+    let reverseScrollComplete = false;
+    let reversePhoneComplete = false;
+    let reverseLandingFrame;
+    let reverseScrollBehavior;
+    let reverseScrollBehaviorCaptured = false;
     let entranceTween;
     let navigationTween;
     if (prefersReducedMotion()) return;
@@ -1191,7 +1327,7 @@ function About() {
           y: "-6vh",
           scale: .24,
           rotation: -8,
-          opacity: 1,
+          opacity: 0,
           transformOrigin: "center center"
         });
         return;
@@ -1260,8 +1396,47 @@ function About() {
       continuousArrivalPending = false;
       gsap.set(aboutScene, { clearProps: "position,left,top,width,height,zIndex,pointerEvents,opacity,transform,transformOrigin" });
     };
+    const finishReverseReturn = () => {
+      if (!reverseScrollComplete || !reversePhoneComplete) return;
+      reverseScrollComplete = false;
+      reversePhoneComplete = false;
+      moving = false;
+      zone = "inactive";
+      gsap.set(aboutScene, {
+        clearProps: "position,left,top,width,height,zIndex,pointerEvents,opacity,transform,transformOrigin"
+      });
+      if (reverseScrollBehaviorCaptured) {
+        if (reverseScrollBehavior) document.documentElement.style.scrollBehavior = reverseScrollBehavior;
+        else document.documentElement.style.removeProperty("scroll-behavior");
+        reverseScrollBehaviorCaptured = false;
+      }
+      window.dispatchEvent(new CustomEvent("work-about-handoff-complete", {
+        detail: { section: "work" }
+      }));
+    };
+    const markReversePhoneComplete = () => {
+      reversePhoneComplete = true;
+      finishReverseReturn();
+    };
+    const waitForReverseLanding = (target) => {
+      cancelAnimationFrame(reverseLandingFrame);
+      const startedAt = performance.now();
+      const checkLanding = () => {
+        if (Math.abs(window.scrollY - target) <= 3 || performance.now() - startedAt > 2000) {
+          reverseLandingFrame = undefined;
+          reverseScrollComplete = true;
+          finishReverseReturn();
+          return;
+        }
+        reverseLandingFrame = requestAnimationFrame(checkLanding);
+      };
+      checkLanding();
+    };
     const holdForRail = () => {
       clearTimeout(settleTimer);
+      reverseScrollComplete = false;
+      reversePhoneComplete = false;
+      window.dispatchEvent(new Event("work-about-handoff-complete"));
       railJumping = true;
       zone = "inactive";
       releaseAboutStage();
@@ -1323,7 +1498,6 @@ function About() {
           return;
         }
         if (zone !== "about") return;
-        releaseAboutStage();
         moving = true;
         aboutObserver.disable();
         const movingForward = self.deltaY > 0;
@@ -1333,22 +1507,66 @@ function About() {
           : galleryScrub
             ? galleryScrub.start + (galleryScrub.end - galleryScrub.start) * .74
             : "#gallery";
-        if (!movingForward) window.dispatchEvent(new Event("prepare-gallery-work-return"));
         navigationTween?.kill();
+        if (!movingForward) {
+          zone = "returning-work";
+          reverseScrollComplete = false;
+          reversePhoneComplete = false;
+          if (!reverseScrollBehaviorCaptured) {
+            reverseScrollBehavior = document.documentElement.style.scrollBehavior;
+            reverseScrollBehaviorCaptured = true;
+          }
+          // GSAP owns this scroll. Native smooth scrolling otherwise keeps
+          // moving after the timeline and briefly drops the sticky Work scene.
+          document.documentElement.style.scrollBehavior = "auto";
+          window.dispatchEvent(new Event("work-about-handoff-start"));
+          window.dispatchEvent(new Event("prepare-gallery-work-return"));
+          entranceTween?.kill();
+          continuousSceneWaiting = false;
+          continuousArrivalPending = false;
+          gsap.killTweensOf([aboutScene, heading, collageStage, ...cards]);
+          gsap.set(aboutScene, {
+            position: "fixed",
+            left: 0,
+            top: 0,
+            width: "100vw",
+            height: "100vh",
+            zIndex: 30,
+            pointerEvents: "none",
+            x: 0,
+            y: 0,
+            scale: 1,
+            rotation: 0,
+            opacity: 1,
+            transformOrigin: "center center"
+          });
+          navigationTween = gsap.timeline({
+            defaults: { ease: "power3.inOut" },
+            onComplete: () => waitForReverseLanding(target)
+          })
+            .to(aboutScene, {
+              x: "-31vw",
+              y: "-6vh",
+              scale: .24,
+              rotation: -8,
+              duration: 1.05
+            }, 0)
+            .add(() => window.dispatchEvent(new Event("resume-gallery-work")), 1.05)
+            .to(aboutScene, { opacity: 0, duration: .38, ease: "power2.in" }, 1.32)
+            .to(window, { scrollTo: target, duration: 1.05 }, 1.05);
+          return;
+        }
+
+        releaseAboutStage();
         navigationTween = gsap.timeline({
           defaults: { ease: "power3.inOut" },
           onComplete: () => {
             moving = false;
-            if (movingForward) {
-              zone = "contact";
-              aboutObserver.enable();
-            } else {
-              zone = "inactive";
-              window.dispatchEvent(new Event("resume-gallery-work"));
-            }
+            zone = "contact";
+            aboutObserver.enable();
           }
         })
-          .to(heading, { opacity: 0, y: movingForward ? -24 : 24, duration: .38 }, 0)
+          .to(heading, { opacity: 0, y: -24, duration: .38 }, 0)
           .to(cards, { opacity: 0, scale: .94, stagger: .025, duration: .4 }, 0)
           .to(window, { scrollTo: target, duration: .95 }, .05);
       }
@@ -1379,9 +1597,13 @@ function About() {
           stagger: .045,
           ease: "power1.out"
         })
-        .set(cards, { clearProps: "opacity" });
+        .set(cards, { clearProps: "opacity" })
+        .add(() => window.dispatchEvent(new CustomEvent("work-about-handoff-complete", {
+          detail: { section: "about" }
+        })));
     };
     window.addEventListener("life-outside-takeover-complete", finishContinuousArrival);
+    window.addEventListener("gallery-work-return-complete", markReversePhoneComplete);
     window.addEventListener("nav-rail-jump-start", holdForRail);
     window.addEventListener("nav-rail-arrive", settleFromRail);
     const enterAbout = () => {
@@ -1449,11 +1671,19 @@ function About() {
       });
       window.removeEventListener("show-life-outside", showAbout);
       window.removeEventListener("life-outside-takeover-complete", finishContinuousArrival);
+      window.removeEventListener("gallery-work-return-complete", markReversePhoneComplete);
       window.removeEventListener("nav-rail-jump-start", holdForRail);
       window.removeEventListener("nav-rail-arrive", settleFromRail);
       clearTimeout(settleTimer);
+      cancelAnimationFrame(reverseLandingFrame);
+      if (reverseScrollBehaviorCaptured) {
+        if (reverseScrollBehavior) document.documentElement.style.scrollBehavior = reverseScrollBehavior;
+        else document.documentElement.style.removeProperty("scroll-behavior");
+        reverseScrollBehaviorCaptured = false;
+      }
       entranceTween?.kill();
       navigationTween?.kill();
+      window.dispatchEvent(new Event("work-about-handoff-complete"));
       aboutObserver.kill();
       trigger.kill();
       contactZoneTrigger.kill();
