@@ -2452,7 +2452,7 @@ function Contact() {
   return (
     <section className="contact dark" id="contact">
       <header className="section-head"><span>04 / Contact</span><span>Drop a record</span></header>
-      <div className="contact-copy"><p>Let’s make something worth replaying.</p><h2>Talk to me before<br />someone else hires me.</h2><div className="contact-links"><a href="mailto:hello@sriharsha.design">hello@sriharsha.design</a><a href="#">LinkedIn</a><a href="#top">Back to top ↑</a></div></div>
+      <div className="contact-copy"><p>Let’s make something worth replaying.</p><h2>Talk to me before<br />someone else hires me.</h2><div className="contact-links"><a href="mailto:nadakudithiharsha@gmail.com">nadakudithiharsha@gmail.com</a><a href="tel:+91863918062">+91 863918062</a><a href="https://www.linkedin.com/in/sriharshanmrs" target="_blank" rel="noreferrer">LinkedIn</a><a href="#top">Back to top ↑</a></div></div>
       <div className="turntable">
         <div className="deck">
           <audio ref={audioRef} preload="metadata" onEnded={() => setPlaying(false)} />
