@@ -5,12 +5,76 @@ import { useRouter } from "next/navigation";
 import { gsap } from "gsap";
 import { Flip, Observer, ScrollToPlugin, ScrollTrigger } from "gsap/all";
 import { Play, SkipBack, SkipForward } from "@phosphor-icons/react";
+import html2canvas from "html2canvas";
 
 gsap.registerPlugin(ScrollTrigger, Observer, Flip, ScrollToPlugin);
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const canRunParticleTransition = () => {
+  if (typeof window === "undefined" || prefersReducedMotion()) return false;
+  const lowPower = (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+    (navigator.deviceMemory && navigator.deviceMemory <= 4);
+  return window.innerWidth >= 900 && !window.matchMedia("(pointer: coarse)").matches && !lowPower;
+};
+
+const sampleTransitionCanvas = (canvas, step = 9, limit = 6500) => {
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+  const samples = [];
+  for (let y = 0; y < canvas.height; y += step) {
+    for (let x = 0; x < canvas.width; x += step) {
+      const index = (y * canvas.width + x) * 4;
+      const alpha = pixels[index + 3];
+      if (alpha <= 10) continue;
+      samples.push({
+        x,
+        y,
+        r: pixels[index],
+        g: pixels[index + 1],
+        b: pixels[index + 2],
+        a: alpha / 255
+      });
+    }
+  }
+  if (samples.length <= limit) return samples;
+  const reduced = [];
+  const stride = samples.length / limit;
+  for (let index = 0; index < limit; index += 1) reduced.push(samples[Math.floor(index * stride)]);
+  return reduced;
+};
+
+const seededUnit = (index, salt = 0) => {
+  const value = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
+  return value - Math.floor(value);
+};
+
+const shuffleTransitionSamples = (samples) => {
+  const shuffled = samples.slice();
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const target = Math.floor(seededUnit(index, 4) * (index + 1));
+    [shuffled[index], shuffled[target]] = [shuffled[target], shuffled[index]];
+  }
+  return shuffled;
+};
+
+const captureTransitionSection = (element) => {
+  const scale = Math.min(.56, 1120 / Math.max(window.innerWidth, 1));
+  return html2canvas(element, {
+    backgroundColor: null,
+    scale,
+    useCORS: true,
+    logging: false,
+    width: element.clientWidth,
+    height: Math.min(element.clientHeight, window.innerHeight),
+    windowWidth: window.innerWidth,
+    windowHeight: window.innerHeight,
+    scrollX: 0,
+    scrollY: -window.scrollY
+  });
+};
 
 const projects = [
   { id: "01", title: "Yield Enhancer", sector: "Fintech · Product strategy", tone: "blue" },
@@ -33,8 +97,10 @@ const collage = [
   ["07", "city", "mid"], ["08", "studio", "back"]
 ];
 const records = [
-  { title: "Night Drive", color: "#6e7fe0" }, { title: "Soft Static", color: "#b33b4e" },
-  { title: "Blue Hour", color: "#5875a9" }, { title: "Last Call", color: "#c8bdb0" }
+  { id: "instant-crush", title: "Instant Crush", art: "instant", cover: "/media/contact/instant-crush.jpg", audio: "/media/audio/instant-crush.mp3" },
+  { id: "avunu-nijam", title: "Avunu Nijam", art: "avunu", cover: "/media/contact/avunu-nijam.jpg", audio: "/media/audio/avunu-nijam.mp3" },
+  { id: "the-way-i-am", title: "The Way I Am", art: "way", cover: "/media/contact/the-way-i-am.jpg", audio: "/media/audio/the-way-i-am.mp3" },
+  { id: "in-the-end", title: "In the End", art: "end", cover: "/media/contact/in-the-end.jpg", audio: "/media/audio/in-the-end.mp3" }
 ];
 const railSections = [
   { id: "top", label: "Hero", pos: .08 },
@@ -339,13 +405,57 @@ function NavRail() {
 
 function Hero() {
   const ref = useRef(null);
-  const [change, setChange] = useState(false);
+  const [changeWord, setChangeWord] = useState("change");
+  const [changeGlitching, setChangeGlitching] = useState(false);
+  const changeSwap = useRef({ active: false, hovered: false, index: 0, timers: [] });
+  const runChangeSequence = () => {
+    changeSwap.current.hovered = true;
+    if (changeSwap.current.active) return;
+    changeSwap.current.timers.forEach(window.clearTimeout);
+    changeSwap.current.timers = [];
+    changeSwap.current.active = true;
+    const words = ["interaction", "design", "change"];
+    const schedule = (callback, delay) => {
+      const timer = window.setTimeout(() => {
+        changeSwap.current.timers = changeSwap.current.timers.filter((entry) => entry !== timer);
+        callback();
+      }, delay);
+      changeSwap.current.timers.push(timer);
+    };
+    const cycle = () => {
+      if (!changeSwap.current.hovered) return;
+      const word = words[changeSwap.current.index];
+      setChangeGlitching(true);
+      schedule(() => setChangeWord(word), 140);
+      schedule(() => setChangeGlitching(false), 470);
+      changeSwap.current.index = (changeSwap.current.index + 1) % words.length;
+      schedule(cycle, 620);
+    };
+    cycle();
+  };
+  const stopChangeSequence = () => {
+    changeSwap.current.hovered = false;
+    changeSwap.current.active = false;
+    changeSwap.current.index = 0;
+    changeSwap.current.timers.forEach(window.clearTimeout);
+    changeSwap.current.timers = [];
+    setChangeGlitching(false);
+    const settleTimer = window.setTimeout(() => {
+      setChangeWord("change");
+    }, 70);
+    changeSwap.current.timers.push(settleTimer);
+  };
+  useEffect(() => () => {
+    changeSwap.current.timers.forEach(window.clearTimeout);
+    changeSwap.current.timers = [];
+  }, []);
   useEffect(() => {
     const el = ref.current;
     let transitioning = false;
     let arrivingFromIntro = false;
     let heroObserver;
     let navigationTween;
+    let particleCanvas;
     const move = (e) => {
       const r = el.getBoundingClientRect();
       el.style.setProperty("--mx", e.clientX - r.left + "px");
@@ -355,23 +465,145 @@ function Hero() {
     const leave = () => el.classList.remove("pointer-live");
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerleave", leave);
-    if (prefersReducedMotion()) {
-      return () => {
-        el.removeEventListener("pointermove", move);
-        el.removeEventListener("pointerleave", leave);
-      };
-    }
-    const enterIntro = () => {
+    const playParticleHandoff = async () => {
+      if (!canRunParticleTransition()) return false;
+      const intro = document.querySelector("#intro");
+      if (!intro) return false;
+      window.dispatchEvent(new Event("hero-intro-particles-start"));
+      try {
+        const [heroFrame, introFrame] = await Promise.all([
+          captureTransitionSection(el),
+          captureTransitionSection(intro)
+        ]);
+        if (!heroFrame.width || !introFrame.width) throw new Error("Unable to capture transition frames");
+
+        const heroSamples = sampleTransitionCanvas(heroFrame);
+        const introSamples = sampleTransitionCanvas(introFrame);
+        const count = Math.min(heroSamples.length, introSamples.length, 6500);
+        if (count < 500) throw new Error("Not enough transition samples");
+        const pickSamples = (samples) => Array.from({ length: count }, (_, index) => samples[Math.floor(index * samples.length / count)]);
+        const starts = pickSamples(heroSamples);
+        const destinations = shuffleTransitionSamples(pickSamples(introSamples));
+        const centerX = heroFrame.width / 2;
+        const centerY = heroFrame.height / 2;
+        const particles = starts.map((start, index) => {
+          const radial = Math.atan2(start.y - centerY, start.x - centerX);
+          const angle = radial + (seededUnit(index, 1) - .5) * 1.35;
+          const distance = 36 + seededUnit(index, 2) * 145;
+          return {
+            ...start,
+            tx: destinations[index].x,
+            ty: destinations[index].y,
+            tr: destinations[index].r,
+            tg: destinations[index].g,
+            tb: destinations[index].b,
+            ta: destinations[index].a,
+            ex: start.x + Math.cos(angle) * distance,
+            ey: start.y + Math.sin(angle) * distance,
+            phase: seededUnit(index, 3) * Math.PI * 2,
+            release: seededUnit(index, 5) * .1
+          };
+        });
+
+        particleCanvas = document.createElement("canvas");
+        particleCanvas.className = "section-particle-transition";
+        particleCanvas.width = heroFrame.width;
+        particleCanvas.height = heroFrame.height;
+        particleCanvas.setAttribute("aria-hidden", "true");
+        const context = particleCanvas.getContext("2d");
+        const state = { progress: 0 };
+        const particleSize = Math.max(2.2, heroFrame.width / window.innerWidth * 5.5);
+        const paint = () => {
+          const progress = state.progress;
+          const exploding = progress < .44;
+          const convergence = exploding ? 0 : (progress - .44) / .56;
+          const convergenceEase = convergence * convergence * convergence
+            * (convergence * (convergence * 6 - 15) + 10);
+          const dustRevealRaw = Math.min(1, progress / .22);
+          const dustReveal = dustRevealRaw * dustRevealRaw * (3 - 2 * dustRevealRaw);
+          context.clearRect(0, 0, particleCanvas.width, particleCanvas.height);
+          context.globalAlpha = dustReveal;
+          for (let index = 0; index < particles.length; index += 1) {
+            const particle = particles[index];
+            const releaseProgress = exploding
+              ? Math.max(0, Math.min(1, (progress - particle.release) / (.44 - particle.release)))
+              : 1;
+            const explosionEase = releaseProgress * releaseProgress * (3 - 2 * releaseProgress);
+            const waveStrength = exploding ? releaseProgress : 1 - convergence;
+            const wave = Math.sin(progress * 11 + particle.phase) * waveStrength * 4;
+            const x = exploding
+              ? particle.x + (particle.ex - particle.x) * explosionEase + wave
+              : particle.ex + (particle.tx - particle.ex) * convergenceEase + wave;
+            const y = exploding
+              ? particle.y + (particle.ey - particle.y) * explosionEase - wave * .55
+              : particle.ey + (particle.ty - particle.ey) * convergenceEase - wave * .55;
+            const colorMix = exploding ? 0 : convergenceEase;
+            const red = Math.round(particle.r + (particle.tr - particle.r) * colorMix);
+            const green = Math.round(particle.g + (particle.tg - particle.g) * colorMix);
+            const blue = Math.round(particle.b + (particle.tb - particle.b) * colorMix);
+            const alpha = particle.a + (particle.ta - particle.a) * colorMix;
+            context.fillStyle = `rgba(${red},${green},${blue},${alpha})`;
+            const size = particleSize * (1 - Math.sin(progress * Math.PI) * .34);
+            context.fillRect(x - size / 2, y - size / 2, size, size);
+          }
+          context.globalAlpha = 1;
+        };
+        paint();
+        document.body.appendChild(particleCanvas);
+        gsap.set(particleCanvas, { opacity: 0 });
+        gsap.set(intro, { opacity: 0 });
+
+        await new Promise((resolve) => {
+          navigationTween = gsap.timeline({
+            onComplete: resolve
+          })
+            .to(particleCanvas, { opacity: 1, duration: .12, ease: "power1.out" }, 0)
+            .to(el, { opacity: 0, duration: .72, ease: "power2.inOut" }, 0)
+            .to(state, { progress: 1, duration: 3.15, ease: "none", onUpdate: paint }, 0)
+            .call(() => window.scrollTo(0, intro.offsetTop), null, .7)
+            .to(intro, { opacity: 1, duration: 1, ease: "power2.inOut" }, 2.72)
+            .to(particleCanvas, { opacity: 0, duration: 1.05, ease: "power2.inOut" }, 2.78);
+        });
+
+        particleCanvas.remove();
+        particleCanvas = null;
+        gsap.set(el, { clearProps: "opacity" });
+        gsap.set(intro, { clearProps: "opacity" });
+        window.dispatchEvent(new Event("hero-intro-particles-ready"));
+        return true;
+      } catch (error) {
+        particleCanvas?.remove();
+        particleCanvas = null;
+        gsap.set(el, { clearProps: "opacity" });
+        gsap.set(intro, { clearProps: "opacity" });
+        window.dispatchEvent(new Event("hero-intro-particles-cancel"));
+        return false;
+      }
+    };
+    const enterIntro = async () => {
       if (transitioning) return;
       transitioning = true;
       navigationTween?.kill();
+      const usedParticles = await playParticleHandoff();
+      if (usedParticles) {
+        heroObserver.disable();
+        transitioning = false;
+        return;
+      }
+      const intro = document.querySelector("#intro");
+      if (intro) gsap.set(intro, { opacity: 0 });
       navigationTween = gsap.timeline({
         defaults: { ease: "power3.inOut" },
-        onComplete: () => { heroObserver.disable(); transitioning = false; }
+        onComplete: () => {
+          gsap.set(el, { clearProps: "opacity" });
+          if (intro) gsap.set(intro, { clearProps: "opacity" });
+          heroObserver.disable();
+          transitioning = false;
+        }
       })
-        .to(".hero-copy", { yPercent: -12, opacity: 0, duration: .65 }, 0)
-        .to(".grid-floor", { opacity: 0, scale: 1.08, duration: .7 }, 0)
-        .to(window, { scrollTo: "#intro", duration: 1.05 }, .05);
+        .to(el, { opacity: 0, duration: .34 }, 0)
+        .to(window, { scrollTo: "#intro", duration: .5 }, .22)
+        .to(intro, { opacity: 1, duration: .34 }, .42);
     };
     const returnToHero = () => {
       if (transitioning || window.scrollY < 2) return;
@@ -441,20 +673,21 @@ function Hero() {
       window.removeEventListener("nav-rail-jump-start", holdForRail);
       window.removeEventListener("nav-rail-arrive", settleFromRail);
       navigationTween?.kill();
+      particleCanvas?.remove();
       heroObserver.kill();
       trigger.kill();
     };
   }, []);
   return (
     <section className="hero dark" ref={ref} id="top">
-      <nav className="nav"><a href="#top" className="nav-logo" aria-label="Sri Harsha — home"><img src="/assets/name-vectorized-nav.svg" alt="" /></a><a href="#contact">Let’s talk <Arrow /></a></nav>
+      <nav className="nav"><a href="#top" className="nav-logo" aria-label="Sri Harsha — home"><img src="/media/hero/name-vectorized-nav.svg" alt="" /></a><a href="#contact">Let’s talk <Arrow /></a></nav>
       <div className="hero-light" />
       <div className="hero-copy">
         <div className="name-wrap">
-          <h1 className="name-vector-heading"><span className="sr-only">Sri Harsha</span><img className="name-vector" src="/assets/name-vectorized.svg" alt="" /></h1>
+          <h1 className="name-vector-heading"><span className="sr-only">Sri Harsha</span><img className="name-vector" src="/media/hero/name-vectorized.svg" alt="" /></h1>
           <i className="spark s1">✦</i><i className="spark s2">✦</i><i className="spark s3">✦</i><i className="spark s4">✦</i><i className="spark s5">✦</i>
         </div>
-        <p className="subhead">Product Designer who can’t resist a good <button onPointerEnter={() => setChange(true)} onPointerLeave={() => setChange(false)} className={change ? "change active" : "change"} data-alt="shift">change</button>.</p>
+        <p className="subhead">Product Designer who can’t resist a good <button onPointerEnter={runChangeSequence} onPointerLeave={stopChangeSequence} className={`change interactive-word${changeGlitching ? " active" : ""}`}><span data-text={changeWord}>{changeWord}</span></button>.</p>
       </div>
       <div className="grid-floor" />
     </section>
@@ -478,10 +711,22 @@ function Intro() {
     const ghostY = gsap.quickTo(ghost, "y", { duration: .85, ease: "power3.out" });
     let moving = false;
     let arrivingFromGallery = false;
+    let arrivingFromHeroParticles = false;
     let movingForward = true;
     let transitionComplete = false;
     let releaseTimer;
     let navigationTween;
+    let introWipeClone;
+    const wipeBeam = document.querySelector(".section-wipe-beam");
+    const discoBall = document.querySelector(".section-disco-ball");
+    const discoRays = document.querySelector(".section-disco-rays");
+    const galleryStage = document.querySelector(".gallery-sticky");
+    const removeIntroWipeClone = () => {
+      if (!introWipeClone) return;
+      gsap.killTweensOf(introWipeClone);
+      introWipeClone.remove();
+      introWipeClone = null;
+    };
     const moveLight = (event) => {
       const bounds = el.getBoundingClientRect();
       const ghostBounds = ghostFrame.getBoundingClientRect();
@@ -540,9 +785,28 @@ function Intro() {
       show();
       introObserver?.enable();
     };
+    const holdForHeroParticles = () => {
+      arrivingFromHeroParticles = true;
+      introObserver?.disable();
+    };
+    const releaseFromHeroParticles = () => {
+      arrivingFromHeroParticles = false;
+      show();
+      introObserver?.enable();
+    };
+    const cancelHeroParticles = () => {
+      arrivingFromHeroParticles = false;
+      introObserver?.disable();
+    };
     const holdForRail = () => {
       const hadHandoff = moving;
       navigationTween?.kill();
+      if (wipeBeam) gsap.set(wipeBeam, { clearProps: "transform,opacity" });
+      if (discoBall) gsap.set(discoBall, { clearProps: "transform,opacity" });
+      if (discoRays) gsap.set(discoRays, { clearProps: "transform,opacity" });
+      if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,willChange" });
+      removeIntroWipeClone();
+      gsap.set(el, { clearProps: "opacity" });
       clearTimeout(releaseTimer);
       moving = false;
       transitionComplete = false;
@@ -560,6 +824,9 @@ function Intro() {
     };
     window.addEventListener("gallery-intro-handoff-start", holdForGallery);
     window.addEventListener("gallery-intro-handoff-ready", releaseFromGallery);
+    window.addEventListener("hero-intro-particles-start", holdForHeroParticles);
+    window.addEventListener("hero-intro-particles-ready", releaseFromHeroParticles);
+    window.addEventListener("hero-intro-particles-cancel", cancelHeroParticles);
     window.addEventListener("nav-rail-jump-start", holdForRail);
     window.addEventListener("nav-rail-arrive", settleFromRail);
     let introObserver;
@@ -583,6 +850,55 @@ function Intro() {
             : "#gallery"
           : "#top";
         navigationTween?.kill();
+        if (movingForward && wipeBeam && discoBall && discoRays) {
+          gsap.set(wipeBeam, { yPercent: 0, opacity: 0 });
+          gsap.set(discoBall, { left: "50vw", xPercent: -50, x: 0, y: -170, rotation: 0, opacity: 1 });
+          gsap.set(discoRays, { xPercent: -50, scaleX: 1, scaleY: 1, rotation: 0, opacity: 0 });
+          const lightScanStart = .78;
+          const lightScanDuration = 1.75;
+          const rayBounds = discoRays.getBoundingClientRect();
+          const rayHeight = Math.max(1, rayBounds.height);
+          const edgeTravel = rayHeight * 2;
+          const revealStart = lightScanStart + lightScanDuration
+            * Math.max(0, Math.min(1, (rayBounds.top + rayHeight - window.innerHeight) / edgeTravel));
+          const revealDuration = lightScanDuration * Math.min(1, window.innerHeight / edgeTravel);
+          if (galleryStage) gsap.set(galleryStage, { clipPath: "inset(100% 0 0 0)", willChange: "clip-path" });
+          removeIntroWipeClone();
+          introWipeClone = el.cloneNode(true);
+          introWipeClone.removeAttribute("id");
+          introWipeClone.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+          introWipeClone.classList.remove("pointer-live");
+          introWipeClone.setAttribute("aria-hidden", "true");
+          document.body.appendChild(introWipeClone);
+          gsap.set(introWipeClone, { position: "fixed", inset: 0, width: "100vw", height: "100svh", minHeight: 0, zIndex: 996, pointerEvents: "none", clipPath: "inset(0 0 0% 0)", willChange: "clip-path" });
+          navigationTween = gsap.timeline({
+            onComplete: () => {
+              gsap.set(wipeBeam, { clearProps: "transform,opacity" });
+              gsap.set(discoBall, { clearProps: "transform,opacity" });
+              gsap.set(discoRays, { clearProps: "transform,opacity" });
+              if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,willChange" });
+              removeIntroWipeClone();
+              gsap.set(el, { clearProps: "opacity" });
+              transitionComplete = true;
+              clearTimeout(releaseTimer);
+              releaseTimer = setTimeout(releaseHandoff, 220);
+            }
+          })
+            .to(discoBall, { y: "13vh", duration: .92, ease: "bounce.out" }, 0)
+            .to(discoRays, { opacity: .68, duration: .18, ease: "power1.out" }, .62)
+            .to(discoRays, { scaleY: -1, duration: lightScanDuration, ease: "none" }, lightScanStart)
+            .call(() => {
+              const destinationY = typeof destination === "number"
+                ? destination
+                : document.querySelector(destination)?.offsetTop ?? 0;
+              window.scrollTo(0, destinationY);
+            }, null, revealStart)
+            .to(introWipeClone, { clipPath: "inset(0 0 100% 0)", duration: revealDuration, ease: "none" }, revealStart)
+            .to(galleryStage, { clipPath: "inset(0% 0 0 0)", duration: revealDuration, ease: "none" }, revealStart)
+            .to(discoRays, { opacity: 0, duration: .52, ease: "power2.out" }, lightScanStart + lightScanDuration)
+            .to(discoBall, { y: -170, opacity: 0, duration: .65, ease: "power2.in" }, lightScanStart + lightScanDuration + .1);
+          return;
+        }
         navigationTween = gsap.timeline({
           defaults: { ease: "power3.inOut" },
           onComplete: () => {
@@ -601,8 +917,8 @@ function Intro() {
       trigger: el,
       start: "top top+=2",
       end: "bottom top",
-      onEnter: () => { show(); if (!arrivingFromGallery) introObserver.enable(); },
-      onEnterBack: () => { show(); if (!arrivingFromGallery) introObserver.enable(); },
+      onEnter: () => { if (!arrivingFromHeroParticles) show(); if (!arrivingFromGallery && !arrivingFromHeroParticles) introObserver.enable(); },
+      onEnterBack: () => { if (!arrivingFromHeroParticles) show(); if (!arrivingFromGallery && !arrivingFromHeroParticles) introObserver.enable(); },
       onLeave: () => introObserver.disable(),
       onLeaveBack: () => introObserver.disable()
     });
@@ -611,10 +927,19 @@ function Intro() {
       el.removeEventListener("pointerleave", hideLight);
       window.removeEventListener("gallery-intro-handoff-start", holdForGallery);
       window.removeEventListener("gallery-intro-handoff-ready", releaseFromGallery);
+      window.removeEventListener("hero-intro-particles-start", holdForHeroParticles);
+      window.removeEventListener("hero-intro-particles-ready", releaseFromHeroParticles);
+      window.removeEventListener("hero-intro-particles-cancel", cancelHeroParticles);
       window.removeEventListener("nav-rail-jump-start", holdForRail);
       window.removeEventListener("nav-rail-arrive", settleFromRail);
       clearTimeout(releaseTimer);
       navigationTween?.kill();
+      if (wipeBeam) gsap.set(wipeBeam, { clearProps: "transform,opacity" });
+      if (discoBall) gsap.set(discoBall, { clearProps: "transform,opacity" });
+      if (discoRays) gsap.set(discoRays, { clearProps: "transform,opacity" });
+      if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,willChange" });
+      removeIntroWipeClone();
+      gsap.set(el, { clearProps: "opacity" });
       handoffLock.kill();
       introObserver.kill();
       trigger.kill();
@@ -622,11 +947,11 @@ function Intro() {
   }, []);
   return (
     <section className="intro dark" id="intro" ref={ref}>
-      <img className="intro-photo" src="/assets/me-in-disco-landscape.png" alt="Sri Harsha in a disco-inspired portrait" />
+      <img className="intro-photo" src="/media/intro/me-in-disco-landscape.png" alt="Sri Harsha in a disco-inspired portrait" />
       <div className="intro-photo-shade" aria-hidden="true" />
       <div className="intro-ghost" aria-hidden="true"><span><b>CONTROL</b></span></div>
       <div className="intro-ghost-fill" aria-hidden="true"><span><b>CONTROL</b></span></div>
-      <img className="intro-photo-reveal" src="/assets/me-in-disco-landscape.png" alt="" aria-hidden="true" />
+      <img className="intro-photo-reveal" src="/media/intro/me-in-disco-landscape.png" alt="" aria-hidden="true" />
       <div className="intro-grain" aria-hidden="true" />
       <div className="intro-divider" aria-hidden="true" />
       <div className="intro-viewfinder" aria-hidden="true"><i /><i /><i /><i /></div>
@@ -1124,7 +1449,7 @@ function Gallery() {
     <section className="gallery-scroll" ref={section} id="gallery">
       <div className="gallery-sticky">
         <div className="gallery-phone-reveal" ref={phoneReveal}>
-          <img src="/assets/hand-phone.png" alt="" />
+          <img src="/media/gallery/hand-phone.png" alt="" />
           <header className="section-head gallery-work-chrome"><span>02 / Selected work</span><span>{p.id} of {String(projects.length).padStart(2, "0")}</span></header>
           <div className="gallery-phone-target" ref={phoneTarget}>
             <div className="gallery-transition-ui" ref={transitionUi} style={{ "--player-accent": playerAccent, "--player-progress": playerProgress + "%", "--seek-angle": playerProgress * 3.6 + "deg" }}>
@@ -1149,14 +1474,14 @@ function Gallery() {
         </div>
         <div className="gallery-visual" ref={visual}>
           <div className="cassette-canvas" ref={cassetteCanvas}>
-            <img className="cassette-art" src="/assets/cassette-without-strip.svg" alt="Cassette body with two chrome reels" />
+            <img className="cassette-art" src="/media/gallery/cassette-without-strip.svg" alt="Cassette body with two chrome reels" />
             <div className="hover-beam" ref={cassetteBeam} aria-hidden="true">
               <div className="beam-glitter">{gallerySparkles.map((style, index) => <i style={style} key={index} />)}</div>
             </div>
             <div className="moving-strip-base" aria-hidden="true" />
             <div className="moving-perforations" aria-hidden="true"><i /><i /></div>
-            <div className="svg-reel svg-reel-left" aria-hidden="true"><img src="/assets/cassette-transparent.svg" alt="" /></div>
-            <div className="svg-reel svg-reel-right" aria-hidden="true"><img src="/assets/cassette-transparent.svg" alt="" /></div>
+            <div className="svg-reel svg-reel-left" aria-hidden="true"><img src="/media/gallery/cassette-transparent.svg" alt="" /></div>
+            <div className="svg-reel svg-reel-right" aria-hidden="true"><img src="/media/gallery/cassette-transparent.svg" alt="" /></div>
             {/* TODO(content): replace with muted, playsInline project videos plus viewport play/pause handling. */}
             <div className="film-mask supplied-film-mask"><div className="film-track" ref={track}>{galleryItems.concat(galleryItems).map((title, i) => <article data-content-status="placeholder" data-project-name={title} className={"gallery-frame film-frame art-" + (i % 5)} onMouseEnter={() => lightCassetteLabel(title)} onMouseLeave={dimCassetteLabel} key={title + i}><div className="fake-motion"><b>{String(i % 5 + 1).padStart(2, "0")}</b><span /></div></article>)}</div></div>
             <div className="cassette-label-strip" ref={cassetteLabelStrip}>
@@ -1262,7 +1587,7 @@ function Work() {
     <section className="work dark" id="work" ref={sectionRef}>
       <header className="section-head"><span>02 / Selected work</span><span>{p.id} of {String(projects.length).padStart(2, "0")}</span></header>
       <div className="phone-stage" ref={phoneStage}>
-        <img src="/assets/hand-phone.png" alt="A hand holding a phone" />
+        <img src="/media/work/hand-phone.png" alt="A hand holding a phone" />
         <div className="phone-ui" ref={phoneUi}>
           <div className="phone-status"><span>9:41</span><span>● ◒</span></div>
           <div className="phone-label">NOW PLAYING</div>
@@ -1695,63 +2020,270 @@ function About() {
         <h2>Life outside work.</h2>
         <div className="about-spotlight" aria-hidden="true" />
         {/* TODO(content): replace gradients with final photos, film stills, playlist covers, and personal portrait. */}
-        <div className="collage">{collage.map(([n, type, depth]) => <article data-content-status="placeholder" className={"collage-card card-" + type} data-depth={depth} key={n}><div className="tape" /><span>{n}</span>{type === "phone" && <img src="/assets/hand-phone.png" alt="" />}</article>)}</div>
+        <div className="collage">{collage.map(([n, type, depth]) => <article data-content-status="placeholder" className={"collage-card card-" + type} data-depth={depth} key={n}><div className="tape" /><span>{n}</span>{type === "phone" && <img src="/media/about/hand-phone.png" alt="" />}</article>)}</div>
       </div>
     </section>
   );
 }
 
 function Contact() {
-  const [record, setRecord] = useState(0), [playing, setPlaying] = useState(false);
+  const [record, setRecord] = useState(null), [playing, setPlaying] = useState(false);
+  const [volume, setVolume] = useState(.72);
   const platterRef = useRef(null);
+  const platterSlotRef = useRef(null);
+  const discRefs = useRef([]);
+  const sleeveRefs = useRef([]);
+  const loadedRecordRef = useRef(null);
+  const recordSwapLocked = useRef(false);
   const tonearmRef = useRef(null);
-  const drag = useRef({ active: false, angle: -12 });
-  const loadRecord = (index, source) => {
-    if (index === record) return;
+  const audioRef = useRef(null);
+  const volumeRef = useRef(.72);
+  const volumeDrag = useRef({ active: false, startX: 0, startY: 0, startVolume: .72 });
+  const scratchDrag = useRef({ active: false, angle: 0, pointerAngle: 0, wasPlaying: false });
+  const drag = useRef({ active: false, angle: -12, startX: 0, startAngle: -12 });
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const source = record === null ? null : records[record].audio;
+    audio.dataset.playback = playing ? "playing" : "paused";
+    gsap.killTweensOf(audio);
+    if (source && audio.getAttribute("src") !== source) {
+      audio.pause();
+      audio.src = source;
+      audio.load();
+      audio.volume = 0;
+    }
+    if (playing && source) {
+      if (audio.ended) audio.currentTime = 0;
+      audio.play().then(() => {
+        if (audio.dataset.playback === "playing") {
+          gsap.to(audio, { volume: volumeRef.current, duration: .9, ease: "power1.out" });
+        }
+      }).catch(() => {});
+    } else {
+      if (audio.paused) {
+        audio.volume = 0;
+      } else {
+        gsap.to(audio, {
+          volume: 0,
+          duration: .7,
+          ease: "power1.inOut",
+          onComplete: () => {
+            if (audio.dataset.playback !== "playing") audio.pause();
+          }
+        });
+      }
+    }
+  }, [record, playing]);
+  useEffect(() => () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    gsap.killTweensOf(audio);
+    audio.pause();
+  }, []);
+  const setTurntableVolume = (value) => {
+    const nextVolume = gsap.utils.clamp(0, 1, Number(value));
+    volumeRef.current = nextVolume;
+    setVolume(nextVolume);
+    const audio = audioRef.current;
+    if (!audio || !playing) return;
+    gsap.killTweensOf(audio);
+    gsap.to(audio, { volume: nextVolume, duration: .16, ease: "power1.out" });
+  };
+  const changeVolume = (event) => setTurntableVolume(event.currentTarget.value);
+  const moveVolume = (event) => {
+    if (!volumeDrag.current.active) return;
+    const horizontal = event.clientX - volumeDrag.current.startX;
+    const vertical = volumeDrag.current.startY - event.clientY;
+    setTurntableVolume(volumeDrag.current.startVolume + (horizontal + vertical) / 180);
+  };
+  const releaseVolume = (event) => {
+    if (!volumeDrag.current.active) return;
+    volumeDrag.current.active = false;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  };
+  const getPointerAngle = (event, element) => {
+    const rect = element.getBoundingClientRect();
+    return Math.atan2(event.clientY - (rect.top + rect.height / 2), event.clientX - (rect.left + rect.width / 2)) * 180 / Math.PI;
+  };
+  const beginScratch = (event) => {
+    if (event.button !== 0 || loadedRecordRef.current === null || recordSwapLocked.current) return;
+    const disc = platterSlotRef.current?.querySelector(".contact-disc");
+    if (!disc) return;
+    event.preventDefault();
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(disc).transform);
+    const visibleAngle = Math.atan2(matrix.b, matrix.a) * 180 / Math.PI;
+    scratchDrag.current = {
+      active: true,
+      angle: visibleAngle,
+      pointerAngle: getPointerAngle(event, event.currentTarget),
+      wasPlaying: playing
+    };
+    disc.style.transform = `rotate(${visibleAngle}deg)`;
+    event.currentTarget.classList.add("scratching");
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    const audio = audioRef.current;
+    if (audio && !playing) {
+      gsap.killTweensOf(audio);
+      audio.volume = volumeRef.current * .72;
+      audio.play().catch(() => {});
+    }
+  };
+  const moveScratch = (event) => {
+    if (!scratchDrag.current.active) return;
+    const disc = platterSlotRef.current?.querySelector(".contact-disc");
+    const audio = audioRef.current;
+    if (!disc) return;
+    event.preventDefault();
+    const pointerAngle = getPointerAngle(event, event.currentTarget);
+    let delta = pointerAngle - scratchDrag.current.pointerAngle;
+    if (delta > 180) delta -= 360;
+    if (delta < -180) delta += 360;
+    scratchDrag.current.pointerAngle = pointerAngle;
+    scratchDrag.current.angle += delta;
+    disc.style.transform = `rotate(${scratchDrag.current.angle}deg)`;
+
+    if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
+      audio.currentTime = gsap.utils.clamp(0, Math.max(0, audio.duration - .02), audio.currentTime + delta / 200);
+    }
+  };
+  const releaseScratch = (event) => {
+    if (!scratchDrag.current.active) return;
+    const disc = platterSlotRef.current?.querySelector(".contact-disc");
+    const audio = audioRef.current;
+    scratchDrag.current.active = false;
+    if (disc) {
+      disc.style.setProperty("--spin-start", `${scratchDrag.current.angle}deg`);
+      disc.style.removeProperty("transform");
+    }
+    event.currentTarget.classList.remove("scratching");
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+
+    if (audio && !scratchDrag.current.wasPlaying) {
+      gsap.killTweensOf(audio);
+      gsap.to(audio, {
+        volume: 0,
+        duration: .16,
+        ease: "power1.out",
+        onComplete: () => {
+          if (audio.dataset.playback !== "playing") audio.pause();
+        }
+      });
+    }
+  };
+  const loadRecord = (index) => {
+    if (index === loadedRecordRef.current || recordSwapLocked.current) return;
+    const incomingDisc = discRefs.current[index];
+    const platterSlot = platterSlotRef.current;
+    const previousIndex = loadedRecordRef.current;
+    const outgoingDisc = previousIndex === null ? null : discRefs.current[previousIndex];
+    const incomingCover = sleeveRefs.current[index]?.querySelector(".sleeve-cover");
+    const outgoingCover = previousIndex === null ? null : sleeveRefs.current[previousIndex]?.querySelector(".sleeve-cover");
+    if (!incomingDisc || !platterSlot) return;
+
+    setPlaying(false);
     if (prefersReducedMotion()) {
-      setPlaying(false);
+      if (outgoingDisc) {
+        sleeveRefs.current[previousIndex]?.appendChild(outgoingDisc);
+        gsap.set(outgoingDisc, { zIndex: 0, clearProps: "transform" });
+      }
+      platterSlot.appendChild(incomingDisc);
+      gsap.set(incomingDisc, { zIndex: 2, clearProps: "transform" });
+      loadedRecordRef.current = index;
       setRecord(index);
       return;
     }
-    const fly = source.querySelector(".mini-record").cloneNode(true);
-    const rect = source.querySelector(".mini-record").getBoundingClientRect();
-    Object.assign(fly.style, {
-      position: "fixed", left: rect.left + "px", top: rect.top + "px",
-      width: rect.width + "px", height: rect.height + "px", zIndex: 1000,
-      pointerEvents: "none", margin: 0
-    });
-    fly.classList.add("flying-record");
-    document.body.appendChild(fly);
-    setPlaying(false);
-    const currentRecord = platterRef.current.querySelector(".record");
-    gsap.to(currentRecord, {
-      y: -70, scale: .55, opacity: 0, duration: .42, ease: "power2.in",
-      onComplete: () => gsap.set(currentRecord, { clearProps: "transform,opacity" })
-    });
-    gsap.to(fly, {
-      y: -90,
-      duration: .28,
-      ease: "power2.out",
-      onComplete: () => Flip.fit(fly, platterRef.current, {
-        duration: .65,
+
+    recordSwapLocked.current = true;
+    const movingDiscs = outgoingDisc ? [outgoingDisc, incomingDisc] : [incomingDisc];
+    Flip.killFlipsOf(movingDiscs);
+    gsap.killTweensOf(movingDiscs);
+
+    if (outgoingDisc) {
+      const outState = Flip.getState(outgoingDisc);
+      sleeveRefs.current[previousIndex]?.appendChild(outgoingDisc);
+      if (outgoingCover) gsap.set(outgoingCover, { zIndex: 11 });
+      gsap.set(outgoingDisc, {
+        xPercent: 110,
+        rotation: 0,
+        zIndex: 10
+      });
+      Flip.from(outState, {
+        duration: 1.15,
+        ease: "power1.inOut",
         scale: true,
-        ease: "power3.in",
-        onComplete: () => { fly.remove(); setRecord(index); }
-      })
+        absolute: true,
+        spin: 1,
+        zIndex: 10,
+        onComplete: () => {
+          queueMicrotask(() => {
+            gsap.fromTo(outgoingDisc, {
+              x: 0,
+              xPercent: 110,
+              rotation: 0,
+              zIndex: 10
+            }, {
+              x: 0,
+              xPercent: 0,
+              rotation: 360,
+              delay: .14,
+              duration: 1.3,
+              ease: "sine.inOut",
+              onComplete: () => {
+                gsap.set(outgoingDisc, { clearProps: "transform,zIndex" });
+                if (outgoingCover) gsap.set(outgoingCover, { clearProps: "zIndex" });
+              }
+            });
+          });
+        }
+      });
+    }
+
+    loadedRecordRef.current = index;
+    setRecord(index);
+    if (incomingCover) gsap.set(incomingCover, { zIndex: 11 });
+    gsap.to(incomingDisc, {
+      xPercent: 110,
+      rotation: 160,
+      zIndex: 10,
+      duration: .9,
+      ease: "power2.inOut",
+      onComplete: () => {
+        if (incomingCover) gsap.set(incomingCover, { clearProps: "zIndex" });
+        const inState = Flip.getState(incomingDisc);
+        platterSlot.appendChild(incomingDisc);
+        gsap.set(incomingDisc, { clearProps: "transform" });
+        Flip.from(inState, {
+          duration: 1.15,
+          ease: "power1.inOut",
+          scale: true,
+          absolute: true,
+          spin: -1,
+          zIndex: 12,
+          onComplete: () => {
+            gsap.set(incomingDisc, { zIndex: 2, clearProps: "transform" });
+            recordSwapLocked.current = false;
+          }
+        });
+      }
     });
   };
   const moveTonearm = (event) => {
     if (!drag.current.active) return;
     const rect = platterRef.current.getBoundingClientRect();
-    const ratio = gsap.utils.clamp(0, 1, (event.clientX - rect.left) / rect.width);
-    drag.current.angle = -12 + ratio * 34;
+    const travel = Math.max(rect.width * .42, 1);
+    const delta = (drag.current.startX - event.clientX) / travel * 34;
+    drag.current.angle = gsap.utils.clamp(-12, 22, drag.current.startAngle + delta);
     tonearmRef.current.style.transform = "rotate(" + drag.current.angle + "deg)";
   };
   const releaseTonearm = (event) => {
     if (!drag.current.active) return;
     drag.current.active = false;
+    event.currentTarget.classList.remove("dragging");
     event.currentTarget.releasePointerCapture?.(event.pointerId);
-    const isDown = drag.current.angle > 5;
+    const isDown = drag.current.angle > -5;
+    drag.current.angle = isDown ? 22 : -12;
     setPlaying(isDown);
     if (prefersReducedMotion()) {
       tonearmRef.current.style.removeProperty("transform");
@@ -1770,25 +2302,69 @@ function Contact() {
       <div className="contact-copy"><p>Let’s make something worth replaying.</p><h2>Talk to me before<br />someone else hires me.</h2><div className="contact-links"><a href="mailto:hello@sriharsha.design">hello@sriharsha.design</a><a href="#">LinkedIn</a><a href="#top">Back to top ↑</a></div></div>
       <div className="turntable">
         <div className="deck">
-          <div className={"platter " + (playing ? "playing" : "")} ref={platterRef}><div className="record" style={{ "--label": records[record].color }}><i /><span>{records[record].title}</span></div></div>
+          <audio ref={audioRef} preload="metadata" onEnded={() => setPlaying(false)} />
+          <div
+            className={"platter " + (playing ? "playing" : "")}
+            ref={platterRef}
+            onPointerDown={beginScratch}
+            onPointerMove={moveScratch}
+            onPointerUp={releaseScratch}
+            onPointerCancel={releaseScratch}
+            title="Drag the vinyl forward or backward to scratch"
+          >
+            <div className="platter-disc-slot" ref={platterSlotRef} />
+          </div>
           <button
             ref={tonearmRef}
             className={"tonearm " + (playing ? "down" : "")}
-            onPointerDown={(event) => { drag.current.active = true; event.currentTarget.setPointerCapture(event.pointerId); }}
+            onPointerDown={(event) => {
+              const matrix = new DOMMatrixReadOnly(getComputedStyle(event.currentTarget).transform);
+              const currentAngle = Math.atan2(matrix.b, matrix.a) * 180 / Math.PI;
+              gsap.killTweensOf(event.currentTarget);
+              drag.current.active = true;
+              drag.current.angle = currentAngle;
+              drag.current.startAngle = currentAngle;
+              drag.current.startX = event.clientX;
+              event.currentTarget.style.transform = `rotate(${currentAngle}deg)`;
+              event.currentTarget.classList.add("dragging");
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
             onPointerMove={moveTonearm}
             onPointerUp={releaseTonearm}
             onPointerCancel={releaseTonearm}
             onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") setPlaying((v) => !v); }}
             aria-label={playing ? "Drag tonearm away to stop" : "Drag tonearm onto the record to play"}
           ><i /><b /></button>
+          <label className="volume-control" title={`Volume ${Math.round(volume * 100)}%`}>
+            <span className="volume-dial" style={{ "--volume-angle": `${-135 + volume * 270}deg` }} aria-hidden="true"><i /></span>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.01"
+              value={volume}
+              onChange={changeVolume}
+              onPointerDown={(event) => {
+                event.preventDefault();
+                volumeDrag.current = { active: true, startX: event.clientX, startY: event.clientY, startVolume: volumeRef.current };
+                event.currentTarget.focus();
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={moveVolume}
+              onPointerUp={releaseVolume}
+              onPointerCancel={releaseVolume}
+              aria-label="Turntable volume"
+            />
+            <b>VOL</b>
+          </label>
           <div className="deck-brand">SH–01<br /><small>MANUAL DRIVE</small></div>
         </div>
-        <div className="record-row">{records.map((r, i) => <button key={r.title} className={record === i ? "selected" : ""} onClick={(event) => loadRecord(i, event.currentTarget)}><span className="mini-record" style={{ "--label": r.color }} /><b>{String(i + 1).padStart(2, "0")}</b><em>{r.title}</em></button>)}</div>
+        <div className="record-row">{records.map((r, i) => <button key={r.id} data-track-id={r.id} className={record === i ? "selected" : ""} onClick={() => loadRecord(i)} aria-label={`Load ${r.title}`}><span className="sleeve" ref={(node) => { sleeveRefs.current[i] = node; }}><span className="sleeve-cover" style={{ backgroundImage: `url("${r.cover}")` }} aria-hidden="true" /><span className={"contact-disc contact-disc-" + r.art} style={{ "--disc-art": `url("${r.cover}")` }} data-home={r.id} ref={(node) => { discRefs.current[i] = node; }} aria-hidden="true"><i /></span></span><b>{String(i + 1).padStart(2, "0")}</b><em>{r.title}</em></button>)}</div>
       </div>
     </section>
   );
 }
 
 export default function Home() {
-  return <main><Hero /><Intro /><Gallery /><About /><Contact /><NavRail /></main>;
+  return <main><Hero /><Intro /><Gallery /><About /><Contact /><div className="section-disco-rays" aria-hidden="true" /><div className="section-wipe-beam" aria-hidden="true" /><div className="section-disco-ball" aria-hidden="true"><i /></div><NavRail /></main>;
 }
