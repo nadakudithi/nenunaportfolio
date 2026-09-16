@@ -465,11 +465,11 @@ function Hero() {
     const leave = () => el.classList.remove("pointer-live");
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerleave", leave);
-    const playParticleHandoff = async () => {
+    const playParticleHandoff = async (reverse = false) => {
       if (!canRunParticleTransition()) return false;
       const intro = document.querySelector("#intro");
       if (!intro) return false;
-      window.dispatchEvent(new Event("hero-intro-particles-start"));
+      if (!reverse) window.dispatchEvent(new Event("hero-intro-particles-start"));
       try {
         const [heroFrame, introFrame] = await Promise.all([
           captureTransitionSection(el),
@@ -477,15 +477,17 @@ function Hero() {
         ]);
         if (!heroFrame.width || !introFrame.width) throw new Error("Unable to capture transition frames");
 
-        const heroSamples = sampleTransitionCanvas(heroFrame);
-        const introSamples = sampleTransitionCanvas(introFrame);
-        const count = Math.min(heroSamples.length, introSamples.length, 6500);
+        const sourceFrame = reverse ? introFrame : heroFrame;
+        const targetFrame = reverse ? heroFrame : introFrame;
+        const sourceSamples = sampleTransitionCanvas(sourceFrame);
+        const targetSamples = sampleTransitionCanvas(targetFrame);
+        const count = Math.min(sourceSamples.length, targetSamples.length, 6500);
         if (count < 500) throw new Error("Not enough transition samples");
         const pickSamples = (samples) => Array.from({ length: count }, (_, index) => samples[Math.floor(index * samples.length / count)]);
-        const starts = pickSamples(heroSamples);
-        const destinations = shuffleTransitionSamples(pickSamples(introSamples));
-        const centerX = heroFrame.width / 2;
-        const centerY = heroFrame.height / 2;
+        const starts = pickSamples(sourceSamples);
+        const destinations = shuffleTransitionSamples(pickSamples(targetSamples));
+        const centerX = sourceFrame.width / 2;
+        const centerY = sourceFrame.height / 2;
         const particles = starts.map((start, index) => {
           const radial = Math.atan2(start.y - centerY, start.x - centerX);
           const angle = radial + (seededUnit(index, 1) - .5) * 1.35;
@@ -507,12 +509,12 @@ function Hero() {
 
         particleCanvas = document.createElement("canvas");
         particleCanvas.className = "section-particle-transition";
-        particleCanvas.width = heroFrame.width;
-        particleCanvas.height = heroFrame.height;
+        particleCanvas.width = sourceFrame.width;
+        particleCanvas.height = sourceFrame.height;
         particleCanvas.setAttribute("aria-hidden", "true");
         const context = particleCanvas.getContext("2d");
         const state = { progress: 0 };
-        const particleSize = Math.max(2.2, heroFrame.width / window.innerWidth * 5.5);
+        const particleSize = Math.max(2.2, sourceFrame.width / window.innerWidth * 5.5);
         const paint = () => {
           const progress = state.progress;
           const exploding = progress < .44;
@@ -551,32 +553,34 @@ function Hero() {
         paint();
         document.body.appendChild(particleCanvas);
         gsap.set(particleCanvas, { opacity: 0 });
-        gsap.set(intro, { opacity: 0 });
+        const source = reverse ? intro : el;
+        const target = reverse ? el : intro;
+        gsap.set(target, { opacity: 0 });
 
         await new Promise((resolve) => {
           navigationTween = gsap.timeline({
             onComplete: resolve
           })
             .to(particleCanvas, { opacity: 1, duration: .12, ease: "power1.out" }, 0)
-            .to(el, { opacity: 0, duration: .72, ease: "power2.inOut" }, 0)
+            .to(source, { opacity: 0, duration: .72, ease: "power2.inOut" }, 0)
             .to(state, { progress: 1, duration: 3.15, ease: "none", onUpdate: paint }, 0)
-            .call(() => window.scrollTo(0, intro.offsetTop), null, .7)
-            .to(intro, { opacity: 1, duration: 1, ease: "power2.inOut" }, 2.72)
+            .call(() => window.scrollTo(0, target.offsetTop), null, .7)
+            .to(target, { opacity: 1, duration: 1, ease: "power2.inOut" }, 2.72)
             .to(particleCanvas, { opacity: 0, duration: 1.05, ease: "power2.inOut" }, 2.78);
         });
 
         particleCanvas.remove();
         particleCanvas = null;
-        gsap.set(el, { clearProps: "opacity" });
-        gsap.set(intro, { clearProps: "opacity" });
-        window.dispatchEvent(new Event("hero-intro-particles-ready"));
+        gsap.set(source, { clearProps: "opacity" });
+        gsap.set(target, { clearProps: "opacity" });
+        if (!reverse) window.dispatchEvent(new Event("hero-intro-particles-ready"));
         return true;
       } catch (error) {
         particleCanvas?.remove();
         particleCanvas = null;
         gsap.set(el, { clearProps: "opacity" });
         gsap.set(intro, { clearProps: "opacity" });
-        window.dispatchEvent(new Event("hero-intro-particles-cancel"));
+        if (!reverse) window.dispatchEvent(new Event("hero-intro-particles-cancel"));
         return false;
       }
     };
@@ -584,7 +588,7 @@ function Hero() {
       if (transitioning) return;
       transitioning = true;
       navigationTween?.kill();
-      const usedParticles = await playParticleHandoff();
+      const usedParticles = await playParticleHandoff(false);
       if (usedParticles) {
         heroObserver.disable();
         transitioning = false;
@@ -604,6 +608,25 @@ function Hero() {
         .to(el, { opacity: 0, duration: .34 }, 0)
         .to(window, { scrollTo: "#intro", duration: .5 }, .22)
         .to(intro, { opacity: 1, duration: .34 }, .42);
+    };
+    const enterHeroWithParticles = async () => {
+      if (transitioning) return;
+      transitioning = true;
+      navigationTween?.kill();
+      const usedParticles = await playParticleHandoff(true);
+      if (!usedParticles) {
+        const intro = document.querySelector("#intro");
+        await new Promise((resolve) => {
+          navigationTween = gsap.timeline({ onComplete: resolve })
+            .to(intro, { opacity: 0, duration: .34, ease: "power2.in" }, 0)
+            .to(window, { scrollTo: "#top", duration: .5, ease: "power3.inOut" }, .2)
+            .fromTo(el, { opacity: 0 }, { opacity: 1, duration: .4, ease: "power2.out" }, .42);
+        });
+        if (intro) gsap.set(intro, { clearProps: "opacity" });
+        gsap.set(el, { clearProps: "opacity" });
+      }
+      transitioning = false;
+      window.dispatchEvent(new Event("intro-hero-particles-complete"));
     };
     const returnToHero = () => {
       if (transitioning || window.scrollY < 2) return;
@@ -638,6 +661,7 @@ function Hero() {
     };
     window.addEventListener("intro-hero-handoff-start", holdForIntro);
     window.addEventListener("intro-hero-handoff-ready", releaseFromIntro);
+    window.addEventListener("intro-hero-particles-request", enterHeroWithParticles);
     window.addEventListener("nav-rail-jump-start", holdForRail);
     window.addEventListener("nav-rail-arrive", settleFromRail);
     heroObserver = Observer.create({
@@ -670,6 +694,7 @@ function Hero() {
       el.removeEventListener("pointerleave", leave);
       window.removeEventListener("intro-hero-handoff-start", holdForIntro);
       window.removeEventListener("intro-hero-handoff-ready", releaseFromIntro);
+      window.removeEventListener("intro-hero-particles-request", enterHeroWithParticles);
       window.removeEventListener("nav-rail-jump-start", holdForRail);
       window.removeEventListener("nav-rail-arrive", settleFromRail);
       navigationTween?.kill();
@@ -804,7 +829,7 @@ function Intro() {
       if (wipeBeam) gsap.set(wipeBeam, { clearProps: "transform,opacity" });
       if (discoBall) gsap.set(discoBall, { clearProps: "transform,opacity" });
       if (discoRays) gsap.set(discoRays, { clearProps: "transform,opacity" });
-      if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,willChange" });
+      if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,filter,willChange" });
       removeIntroWipeClone();
       gsap.set(el, { clearProps: "opacity" });
       clearTimeout(releaseTimer);
@@ -822,6 +847,12 @@ function Intro() {
       show();
       introObserver?.enable();
     };
+    const finishHeroParticleReturn = () => {
+      if (!moving || movingForward) return;
+      transitionComplete = true;
+      clearTimeout(releaseTimer);
+      releaseTimer = setTimeout(releaseHandoff, 220);
+    };
     window.addEventListener("gallery-intro-handoff-start", holdForGallery);
     window.addEventListener("gallery-intro-handoff-ready", releaseFromGallery);
     window.addEventListener("hero-intro-particles-start", holdForHeroParticles);
@@ -829,6 +860,7 @@ function Intro() {
     window.addEventListener("hero-intro-particles-cancel", cancelHeroParticles);
     window.addEventListener("nav-rail-jump-start", holdForRail);
     window.addEventListener("nav-rail-arrive", settleFromRail);
+    window.addEventListener("intro-hero-particles-complete", finishHeroParticleReturn);
     let introObserver;
     introObserver = Observer.create({
       target: window,
@@ -855,14 +887,14 @@ function Intro() {
           gsap.set(discoBall, { left: "50vw", xPercent: -50, x: 0, y: -170, rotation: 0, opacity: 1 });
           gsap.set(discoRays, { xPercent: -50, scaleX: 1, scaleY: 1, rotation: 0, opacity: 0 });
           const lightScanStart = .78;
-          const lightScanDuration = 1.75;
+          const lightScanDuration = 2.25;
           const rayBounds = discoRays.getBoundingClientRect();
           const rayHeight = Math.max(1, rayBounds.height);
           const edgeTravel = rayHeight * 2;
           const revealStart = lightScanStart + lightScanDuration
             * Math.max(0, Math.min(1, (rayBounds.top + rayHeight - window.innerHeight) / edgeTravel));
           const revealDuration = lightScanDuration * Math.min(1, window.innerHeight / edgeTravel);
-          if (galleryStage) gsap.set(galleryStage, { clipPath: "inset(100% 0 0 0)", willChange: "clip-path" });
+          if (galleryStage) gsap.set(galleryStage, { clipPath: "inset(100% 0 0 0)", filter: "brightness(.86) saturate(.86) contrast(.98)", willChange: "clip-path,filter" });
           removeIntroWipeClone();
           introWipeClone = el.cloneNode(true);
           introWipeClone.removeAttribute("id");
@@ -870,13 +902,13 @@ function Intro() {
           introWipeClone.classList.remove("pointer-live");
           introWipeClone.setAttribute("aria-hidden", "true");
           document.body.appendChild(introWipeClone);
-          gsap.set(introWipeClone, { position: "fixed", inset: 0, width: "100vw", height: "100svh", minHeight: 0, zIndex: 996, pointerEvents: "none", clipPath: "inset(0 0 0% 0)", willChange: "clip-path" });
+          gsap.set(introWipeClone, { position: "fixed", inset: 0, width: "100vw", height: "100svh", minHeight: 0, zIndex: 996, pointerEvents: "none", clipPath: "inset(0 0 0% 0)", filter: "drop-shadow(0 18px 28px rgba(132,148,240,.2))", willChange: "clip-path" });
           navigationTween = gsap.timeline({
             onComplete: () => {
               gsap.set(wipeBeam, { clearProps: "transform,opacity" });
               gsap.set(discoBall, { clearProps: "transform,opacity" });
               gsap.set(discoRays, { clearProps: "transform,opacity" });
-              if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,willChange" });
+              if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,filter,willChange" });
               removeIntroWipeClone();
               gsap.set(el, { clearProps: "opacity" });
               transitionComplete = true;
@@ -895,8 +927,13 @@ function Intro() {
             }, null, revealStart)
             .to(introWipeClone, { clipPath: "inset(0 0 100% 0)", duration: revealDuration, ease: "none" }, revealStart)
             .to(galleryStage, { clipPath: "inset(0% 0 0 0)", duration: revealDuration, ease: "none" }, revealStart)
+            .to(galleryStage, { filter: "brightness(1) saturate(1) contrast(1)", duration: .55, ease: "power2.out" }, lightScanStart + lightScanDuration)
             .to(discoRays, { opacity: 0, duration: .52, ease: "power2.out" }, lightScanStart + lightScanDuration)
             .to(discoBall, { y: -170, opacity: 0, duration: .65, ease: "power2.in" }, lightScanStart + lightScanDuration + .1);
+          return;
+        }
+        if (!movingForward) {
+          window.dispatchEvent(new Event("intro-hero-particles-request"));
           return;
         }
         navigationTween = gsap.timeline({
@@ -932,12 +969,13 @@ function Intro() {
       window.removeEventListener("hero-intro-particles-cancel", cancelHeroParticles);
       window.removeEventListener("nav-rail-jump-start", holdForRail);
       window.removeEventListener("nav-rail-arrive", settleFromRail);
+      window.removeEventListener("intro-hero-particles-complete", finishHeroParticleReturn);
       clearTimeout(releaseTimer);
       navigationTween?.kill();
       if (wipeBeam) gsap.set(wipeBeam, { clearProps: "transform,opacity" });
       if (discoBall) gsap.set(discoBall, { clearProps: "transform,opacity" });
       if (discoRays) gsap.set(discoRays, { clearProps: "transform,opacity" });
-      if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,willChange" });
+      if (galleryStage) gsap.set(galleryStage, { clearProps: "clipPath,filter,willChange" });
       removeIntroWipeClone();
       gsap.set(el, { clearProps: "opacity" });
       handoffLock.kill();
@@ -1051,6 +1089,27 @@ function Gallery() {
     let projectObserver;
     let storyTimeline;
     let stateTimeline;
+    let galleryIntroTween;
+    let galleryIntroClone;
+    const removeGalleryIntroClone = () => {
+      if (!galleryIntroClone) return;
+      gsap.killTweensOf(galleryIntroClone);
+      galleryIntroClone.remove();
+      galleryIntroClone = null;
+    };
+    const clearGalleryIntroTransition = () => {
+      const ownsReverseTransition = Boolean(galleryIntroTween || galleryIntroClone);
+      galleryIntroTween?.kill();
+      galleryIntroTween = null;
+      removeGalleryIntroClone();
+      if (!ownsReverseTransition) return;
+      const discoBall = document.querySelector(".section-disco-ball");
+      const discoRays = document.querySelector(".section-disco-rays");
+      const intro = document.querySelector("#intro");
+      if (discoBall) gsap.set(discoBall, { clearProps: "transform,opacity" });
+      if (discoRays) gsap.set(discoRays, { clearProps: "transform,opacity" });
+      if (intro) gsap.set(intro, { clearProps: "filter,willChange" });
+    };
     const setWorkMode = (active) => section.current?.classList.toggle("is-work-mode", active);
     const resumeReturnDiscMotion = () => {
       pausedReturnDiscs.forEach((disc) => disc.style.removeProperty("animation-play-state"));
@@ -1116,6 +1175,7 @@ function Gallery() {
       gsap.killTweensOf([visual.current, cassetteCanvas.current, phoneReveal.current, transitionUi.current, ...chrome]);
     };
     const resetTransition = () => {
+      clearGalleryIntroTransition();
       killGalleryMotion();
       transitioning = false;
       returningFromAbout = false;
@@ -1391,12 +1451,42 @@ function Gallery() {
             clearTimeout(introReleaseTimer);
             window.dispatchEvent(new Event("gallery-intro-handoff-start"));
             transitionLock.enable();
-            gsap.to(window, {
-              scrollTo: "#intro",
-              duration: .68,
-              ease: "power3.out",
-              overwrite: true,
+            const galleryStage = section.current.querySelector(".gallery-sticky");
+            const intro = document.querySelector("#intro");
+            const discoBall = document.querySelector(".section-disco-ball");
+            const discoRays = document.querySelector(".section-disco-rays");
+            if (!galleryStage || !intro || !discoBall || !discoRays) {
+              window.scrollTo(0, intro?.offsetTop ?? 0);
+              introLandingComplete = true;
+              introReleaseTimer = setTimeout(() => {
+                landingOnIntro = false;
+                transitionLock.disable();
+                window.dispatchEvent(new Event("gallery-intro-handoff-ready"));
+              }, 220);
+              return;
+            }
+            galleryIntroClone = galleryStage.cloneNode(true);
+            galleryIntroClone.querySelectorAll("[id]").forEach((node) => node.removeAttribute("id"));
+            galleryIntroClone.setAttribute("aria-hidden", "true");
+            document.body.appendChild(galleryIntroClone);
+            gsap.set(galleryIntroClone, { position: "fixed", inset: 0, width: "100vw", height: "100svh", minHeight: 0, zIndex: 996, pointerEvents: "none", clipPath: "inset(0% 0 0 0)", filter: "drop-shadow(0 -18px 28px rgba(132,148,240,.2))", willChange: "clip-path" });
+            gsap.set(intro, { filter: "brightness(.86) saturate(.86) contrast(.98)", willChange: "filter" });
+            gsap.set(discoBall, { left: "50vw", xPercent: -50, x: 0, y: -170, rotation: 0, opacity: 1 });
+            const reverseLightOverscan = 1.18;
+            gsap.set(discoRays, { xPercent: -50, scaleX: 1, scaleY: -reverseLightOverscan, rotation: 0, opacity: 0 });
+            const lightScanStart = .78;
+            const lightScanDuration = 2.25 * ((reverseLightOverscan + 1) / 2);
+            const rayBounds = discoRays.getBoundingClientRect();
+            const rayHeight = Math.max(1, rayBounds.height);
+            const unscaledRayHeight = rayHeight / reverseLightOverscan;
+            const edgeTravel = unscaledRayHeight * (reverseLightOverscan + 1);
+            const apexY = rayBounds.bottom;
+            const revealStart = lightScanStart + lightScanDuration
+              * Math.max(0, Math.min(1, (unscaledRayHeight * reverseLightOverscan - apexY) / edgeTravel));
+            const revealDuration = lightScanDuration * Math.min(1, window.innerHeight / edgeTravel);
+            galleryIntroTween = gsap.timeline({
               onComplete: () => {
+                clearGalleryIntroTransition();
                 introLandingComplete = true;
                 clearTimeout(introReleaseTimer);
                 introReleaseTimer = setTimeout(() => {
@@ -1405,11 +1495,19 @@ function Gallery() {
                   window.dispatchEvent(new Event("gallery-intro-handoff-ready"));
                 }, 220);
               }
-            });
+            })
+              .to(discoBall, { y: "13vh", duration: .92, ease: "bounce.out" }, 0)
+              .to(discoRays, { opacity: .68, duration: .18, ease: "power1.out" }, .62)
+              .to(discoRays, { scaleY: 1, duration: lightScanDuration, ease: "none" }, lightScanStart)
+              .call(() => window.scrollTo(0, intro.offsetTop), null, revealStart)
+              .to(galleryIntroClone, { clipPath: "inset(100% 0 0 0)", duration: revealDuration, ease: "none" }, revealStart)
+              .to(intro, { filter: "brightness(1) saturate(1) contrast(1)", duration: .55, ease: "power2.out" }, lightScanStart + lightScanDuration)
+              .to(discoRays, { opacity: 0, duration: .52, ease: "power2.out" }, lightScanStart + lightScanDuration)
+              .to(discoBall, { y: -170, opacity: 0, duration: .65, ease: "power2.in" }, lightScanStart + lightScanDuration + .1);
           }
         }
       })
-        .to(track.current, { xPercent: -50, duration: 3, ease: "none" }, 0)
+        .to(track.current, { x: () => -(track.current.querySelector(".film-frame")?.offsetWidth || 0) * (galleryItems.length - 1), duration: 3, ease: "none" }, 0)
         .to(".moving-perforations i", { backgroundPositionX: "-50vw", duration: 3, ease: "none" }, 0)
         .to(".svg-reel-left", { rotation: 960, duration: 3, ease: "none" }, 0)
         .to(".svg-reel-right", { rotation: -960, duration: 3, ease: "none" }, 0)
@@ -1427,6 +1525,7 @@ function Gallery() {
       window.removeEventListener("nav-rail-jump-ready", releaseFromRailJump);
       clearTimeout(introReleaseTimer);
       clearTimeout(returnSettleTimer);
+      clearGalleryIntroTransition();
       window.clearTimeout(beamTimer.current);
       killGalleryMotion();
       removeReturnPhoneClone();
