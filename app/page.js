@@ -77,12 +77,34 @@ const captureTransitionSection = (element) => {
 };
 
 const projects = [
-  { id: "01", title: "Yield Enhancer", sector: "Fintech · Product strategy", tone: "blue" },
-  { id: "02", title: "Rituals", sector: "Wellness · Mobile product", tone: "red" },
-  { id: "03", title: "After Hours", sector: "Culture · Digital experience", tone: "silver" },
-  { id: "04", title: "Northstar", sector: "AI · Interaction design", tone: "violet" }
+  { id: "01", title: "Hydrate AI", summary: "Hydration changes every day. So does the system. (Agentic AI concept project)", sector: "Wellness · Mobile product", tone: "blue", thumbnail: "/media/work/Work%20Discs/01-Water%20Habit%20Thumbnail.png" },
+  { id: "02", title: "Yield Enhancer", summary: "Turning idle cash into returns: an AI tool for finance teams.", sector: "Fintech · Product strategy", tone: "red", thumbnail: "/media/work/Work%20Discs/02-YE%20Thumbnail.png" },
+  { id: "03", title: "FinFlex AI", summary: "What would a finance app look like if it was built for Gen-Z first? (Concept project)", sector: "Fintech · Product design", tone: "silver", thumbnail: "/media/work/Work%20Discs/03-FinFlex%20Thumbnail.png" },
+  { id: "04", title: "ResortOps", summary: "Managing 80 buggies across a 500-acre resort. Giving teams clarity on what to act on first. (Vibe coded concept project)", sector: "Hospitality · Operations platform", tone: "violet", thumbnail: "/media/work/Work%20Discs/04-ResortOps%20Thumbnail.png" },
+  { id: "05", title: "BigBasket", summary: "Less thinking, faster shopping: reimagining BigBasket with combos and recipes. (Concept project)", sector: "E-commerce · Product design", tone: "blue", thumbnail: "/media/work/Work%20Discs/05-BigBasket%20Thumbnail.png" }
 ];
-const galleryItems = ["Kinetic type", "A new kind of bank", "Midnight radio", "Human systems", "Motion studies"];
+const galleryItems = [
+  { title: "Adding Items Galaxy", src: "/media/gallery/Strip%20Content/Adding%20Items%20Galaxy.mp4" },
+  { title: "Agentic Water Showcase", src: "/media/gallery/Strip%20Content/Agentic%20Water%20Showcase.mp4" },
+  { title: "AI Chat", src: "/media/gallery/Strip%20Content/AI%20chat.mp4" },
+  { title: "AI Voice", src: "/media/gallery/Strip%20Content/AI%20Voice.mp4", portrait: true },
+  { title: "Ticket Click", src: "/media/gallery/Strip%20Content/Ticket%20Click.mp4" },
+  { title: "Apex Liquid Metal", src: "/media/gallery/Strip%20Content/Apex%20Liq%20Met.mp4" },
+  { title: "Light On", src: "/media/gallery/Strip%20Content/Light%20on.mp4", portrait: true },
+  { title: "Brain Dump", src: "/media/gallery/Strip%20Content/Brain%20Dump.mp4", portrait: true },
+  { title: "Calendar", src: "/media/gallery/Strip%20Content/Calendar.mp4", portrait: true },
+  { title: "Card Change", src: "/media/gallery/Strip%20Content/Card%20Change.mp4" },
+  { title: "Color Changing Galaxy", src: "/media/gallery/Strip%20Content/Color%20Changin%20Galaxy.mp4" },
+  { title: "Goku Video", src: "/media/gallery/Strip%20Content/Goku%20Vdieo.mp4" },
+  { title: "Instagram Shine", src: "/media/gallery/Strip%20Content/Insta%20%20Shine.mp4" },
+  { title: "Me Shouting", src: "/media/gallery/Strip%20Content/Me%20Shouting.mp4" },
+  { title: "Ongoing Cards", src: "/media/gallery/Strip%20Content/Ongoing%20Cards.mp4", portrait: true },
+  { title: "Payment Made", src: "/media/gallery/Strip%20Content/Payment%20Made.mp4" },
+  { title: "SpongeBob", src: "/media/gallery/Strip%20Content/Spongebob.mp4" },
+  { title: "Timer Running", src: "/media/gallery/Strip%20Content/Timer%20Running.mp4", portrait: true },
+  { title: "Valorant Liquid Metal", src: "/media/gallery/Strip%20Content/Valo%20Liq%20Met.mp4" },
+  { title: "YouTube Shine", src: "/media/gallery/Strip%20Content/Youtube%20Shine.mp4" }
+];
 const gallerySparkles = Array.from({ length: 48 }, (_, index) => ({
   "--spark-x": `${7 + (index * 37) % 87}%`,
   "--spark-drift": `${-42 + (index * 29) % 85}px`,
@@ -92,9 +114,16 @@ const gallerySparkles = Array.from({ length: 48 }, (_, index) => ({
   "--spark-rise": `${12 + (index * 17) % 15}vh`
 }));
 const collage = [
-  ["01", "cinema", "back"], ["02", "coast", "mid"], ["03", "portrait", "front"],
-  ["04", "night", "back"], ["05", "playlist", "front"], ["06", "phone", "mid"],
-  ["07", "city", "mid"], ["08", "studio", "back"]
+  { id: "01", type: "cinema", depth: "back", kind: "image", src: "/media/about/All%20my%20about/WhatsApp%20Image%202026-09-16%20at%2011.00.42%20PM.jpeg" },
+  { id: "02", type: "coast", depth: "mid", kind: "image", src: "/media/about/All%20my%20about/WhatsApp%20Image%202026-09-16%20at%2011.00.43%20PM.jpeg" },
+  { id: "03", type: "portrait", depth: "front", kind: "image", src: "/media/about/All%20my%20about/WhatsApp%20Image%202026-09-16%20at%2011.00.44%20PM.jpeg" },
+  { id: "04", type: "night", depth: "back", kind: "image", src: "/media/about/All%20my%20about/WhatsApp%20Image%202026-09-16%20at%2011.00.44%20PM%20(1).jpeg" },
+  { id: "05", type: "playlist", depth: "front", kind: "image", src: "/media/about/All%20my%20about/WhatsApp%20Image%202026-09-16%20at%2011.00.44%20PM%20(2).jpeg" },
+  { id: "06", type: "phone", depth: "mid", kind: "video", src: "/media/about/All%20my%20about/WhatsApp%20Video%202026-09-16%20at%2011.01.17%20PM.mp4" },
+  { id: "07", type: "city", depth: "mid", kind: "image", src: "/media/about/All%20my%20about/WhatsApp%20Image%202026-09-16%20at%2011.03.20%20PM.jpeg" },
+  { id: "08", type: "studio", depth: "back", kind: "image", src: "/media/about/All%20my%20about/WhatsApp%20Image%202026-09-16%20at%2011.06.00%20PM.jpeg" },
+  { id: "09", type: "extra-a", depth: "front", kind: "video", src: "/media/about/All%20my%20about/WhatsApp%20Video%202026-09-16%20at%2011.08.54%20PM.mp4" },
+  { id: "10", type: "extra-b", depth: "back", kind: "image", src: "/media/about/All%20my%20about/626875a8-3743-4d98-a66d-de02584f0336.jpg" }
 ];
 const records = [
   { id: "instant-crush", title: "Instant Crush", art: "instant", cover: "/media/contact/instant-crush.jpg", audio: "/media/audio/instant-crush.mp3" },
@@ -1054,7 +1083,7 @@ function Gallery() {
     workLocked.current = true;
     const direction = target > activeRef.current ? 1 : -1;
     const disc = transitionUi.current?.querySelector(".work-disc");
-    const meta = transitionUi.current?.querySelector(".phone-meta");
+    const meta = transitionUi.current?.querySelectorAll(".phone-meta,.player-readout");
     gsap.timeline({ onComplete: () => { workLocked.current = false; } })
       .to(disc, { xPercent: -118 * direction, rotation: -145 * direction, duration: .42, ease: "power2.in" }, 0)
       .to(meta, { opacity: .42, duration: .2, ease: "power2.in" }, 0)
@@ -1536,6 +1565,27 @@ function Gallery() {
       ctx.revert();
     };
   }, []);
+  useEffect(() => {
+    const mask = section.current?.querySelector(".supplied-film-mask");
+    const videos = Array.from(section.current?.querySelectorAll(".gallery-frame-media") || []);
+    if (!mask || !videos.length) return;
+    if (!("IntersectionObserver" in window)) {
+      videos.forEach((video) => video.play().catch(() => {}));
+      return () => videos.forEach((video) => video.pause());
+    }
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        const video = entry.target;
+        if (entry.isIntersecting) video.play().catch(() => {});
+        else video.pause();
+      });
+    }, { root: mask, rootMargin: "0px 18%", threshold: .08 });
+    videos.forEach((video) => observer.observe(video));
+    return () => {
+      observer.disconnect();
+      videos.forEach((video) => video.pause());
+    };
+  }, []);
   const p = projects[active];
   const playerProgress = ((seekActive + 1) / projects.length) * 100;
   const playerAccent = {
@@ -1555,9 +1605,9 @@ function Gallery() {
               <div className="phone-status"><span>9:41</span><span>● ◒</span></div>
               <div className="player-kicker"><span>PORTFOLIO PLAYER</span><b>{p.id} / {String(projects.length).padStart(2, "0")}</b></div>
               <div className="phone-meta"><span>{p.sector}</span><strong>{p.title}</strong></div>
-              <div className="player-readout" aria-hidden="true"><i /><i /><i /><i /></div>
+              <div className="player-readout"><p>{p.summary}</p></div>
               <div className="work-disc-stage">
-                <div className={"work-disc work-disc-" + p.tone}><Artwork {...p} /></div>
+                <div className={"work-disc work-disc-" + p.tone}><Artwork key={p.id} {...p} /></div>
                 <div className="work-seek-ring" style={{ "--ring-progress": playerProgress + "%" }} aria-hidden="true" />
                 <div className="work-seek-marker" aria-hidden="true"><i /></div>
               </div>
@@ -1581,8 +1631,7 @@ function Gallery() {
             <div className="moving-perforations" aria-hidden="true"><i /><i /></div>
             <div className="svg-reel svg-reel-left" aria-hidden="true"><img src="/media/gallery/cassette-transparent.svg" alt="" /></div>
             <div className="svg-reel svg-reel-right" aria-hidden="true"><img src="/media/gallery/cassette-transparent.svg" alt="" /></div>
-            {/* TODO(content): replace with muted, playsInline project videos plus viewport play/pause handling. */}
-            <div className="film-mask supplied-film-mask"><div className="film-track" ref={track}>{galleryItems.concat(galleryItems).map((title, i) => <article data-content-status="placeholder" data-project-name={title} className={"gallery-frame film-frame art-" + (i % 5)} onMouseEnter={() => lightCassetteLabel(title)} onMouseLeave={dimCassetteLabel} key={title + i}><div className="fake-motion"><b>{String(i % 5 + 1).padStart(2, "0")}</b><span /></div></article>)}</div></div>
+            <div className="film-mask supplied-film-mask"><div className="film-track" ref={track}>{galleryItems.map((item, i) => <article data-content-status="supplied" data-project-name={item.title} className={`gallery-frame film-frame${item.portrait ? " is-portrait" : ""}`} onMouseEnter={() => lightCassetteLabel(item.title)} onMouseLeave={dimCassetteLabel} key={item.src}><video className="gallery-frame-media" src={item.src} muted loop playsInline preload="metadata" aria-label={item.title} /><span className="gallery-frame-number" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span></article>)}</div></div>
             <div className="cassette-label-strip" ref={cassetteLabelStrip}>
               <div className="cassette-label" ref={cassetteLabel} aria-live="polite" />
             </div>
@@ -1593,8 +1642,12 @@ function Gallery() {
   );
 }
 
-function Artwork({ tone, id }) {
-  return <div className={"artwork artwork-" + tone}><span>TRACK<br />{id}</span><i /></div>;
+function Artwork({ tone, title, thumbnail }) {
+  return (
+    <div className={"artwork artwork-" + tone + (thumbnail ? " has-thumbnail" : "")}>
+      {thumbnail ? <img className="artwork-thumbnail" src={thumbnail} alt={title + " case study thumbnail"} /> : null}
+    </div>
+  );
 }
 
 function Work() {
@@ -1690,7 +1743,7 @@ function Work() {
         <div className="phone-ui" ref={phoneUi}>
           <div className="phone-status"><span>9:41</span><span>● ◒</span></div>
           <div className="phone-label">NOW PLAYING</div>
-          <Artwork {...p} />
+          <Artwork key={p.id} {...p} />
           <div className="phone-meta"><strong>{p.title}</strong><span>{p.sector}</span></div>
           <div className="progress"><i /><b /></div>
           <div className="controls">
@@ -1794,9 +1847,11 @@ function About() {
       spotlightCard = event.currentTarget;
       aimSpotlight(spotlightCard);
       spotlight.classList.add("is-active");
+      spotlightCard.querySelector("video")?.play().catch(() => {});
     };
     const hideSpotlight = (event) => {
       if (spotlightCard !== event.currentTarget) return;
+      event.currentTarget.querySelector("video")?.pause();
       spotlightCard = null;
       requestAnimationFrame(() => {
         if (!spotlightCard) spotlight.classList.remove("is-active");
@@ -2118,8 +2173,7 @@ function About() {
       <div className="about-stage">
         <h2>Life outside work.</h2>
         <div className="about-spotlight" aria-hidden="true" />
-        {/* TODO(content): replace gradients with final photos, film stills, playlist covers, and personal portrait. */}
-        <div className="collage">{collage.map(([n, type, depth]) => <article data-content-status="placeholder" className={"collage-card card-" + type} data-depth={depth} key={n}><div className="tape" /><span>{n}</span>{type === "phone" && <img src="/media/about/hand-phone.png" alt="" />}</article>)}</div>
+        <div className="collage">{collage.map((item) => <article data-content-status="supplied" className={"collage-card card-" + item.type} data-depth={item.depth} key={item.id}><div className="tape" />{item.kind === "video" ? <video className="collage-media" src={item.src} muted loop playsInline preload="metadata" aria-label={"Life outside work " + item.id} /> : <img className="collage-media" src={item.src} alt={"Life outside work " + item.id} />}<span>{item.id}</span></article>)}</div>
       </div>
     </section>
   );
