@@ -136,10 +136,10 @@ button { background:none; border:0; padding:0; }
 .intro-body p { margin:0; }
 .intro-body p+p { margin-top:18px; }
 
-.gallery-scroll { height:auto; background:#fff; }
-.gallery-sticky { height:100vh; min-height:min(680px,100svh); position:relative; overflow:hidden; background:#fff; color:#101012; }
+.gallery-scroll { height:auto; background:#edebe6; }
+.gallery-sticky { height:100vh; min-height:min(680px,100svh); position:relative; overflow:hidden; background:#edebe6; color:#101012; }
 .gallery-scroll.is-work-mode,.gallery-scroll.is-work-mode .gallery-sticky { background:#08080a; }
-.gallery-visual { position:absolute; z-index:2; inset:0; overflow:hidden; background:#fff; transform-origin:0 0; }
+.gallery-visual { position:absolute; z-index:2; inset:0; overflow:hidden; background:#edebe6; transform-origin:0 0; }
 .gallery-phone-reveal { position:absolute; z-index:1; inset:0; overflow:hidden; background:#08080a; opacity:0; }
 .gallery-phone-reveal>img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:center; }
 .gallery-phone-target { position:absolute; z-index:3; left:40.05%; top:13%; width:17.2%; height:70.9%; overflow:hidden; border-radius:13% / 6.5%; }
@@ -192,18 +192,20 @@ button { background:none; border:0; padding:0; }
 .svg-reel img { position:absolute; top:-49%; width:1128.9%; height:844.6%; max-width:none; }
 .svg-reel-left img { left:-46.3%; }
 .svg-reel-right img { left:-980.3%; }
-.moving-strip-base { position:absolute; z-index:0; inset:0 0 auto; height:24.39%; background:#bd7180; pointer-events:none; }
+.moving-strip-base { position:absolute; z-index:0; inset:0 0 auto; height:24.39%; background:#0a0a0b; pointer-events:none; }
 .moving-perforations { position:absolute; z-index:1; left:0; right:0; top:0; height:24.39%; pointer-events:none; }
-.moving-perforations i { position:absolute; left:0; width:100%; height:5.83%; background-color:#bd7180; background-image:repeating-linear-gradient(90deg,#fff 0 clamp(8px,1.25vw,24px),transparent clamp(8px,1.25vw,24px) clamp(13px,2.08vw,40px)); background-position-x:0; }
+.moving-perforations i { position:absolute; left:0; width:100%; height:5.83%; background-color:#0a0a0b; background-image:repeating-linear-gradient(90deg,#fff 0 clamp(8px,1.25vw,24px),transparent clamp(8px,1.25vw,24px) clamp(13px,2.08vw,40px)); background-position-x:0; }
 .moving-perforations i:first-child { top:0; }
 .moving-perforations i:last-child { bottom:0; }
+.moving-perforations i:first-child:after { content:""; position:absolute; left:0; right:0; top:0; height:45%; background:#000; }
+.moving-perforations i:last-child:before { content:""; position:absolute; left:0; right:0; bottom:0; height:45%; background:#000; }
 .film-mask { position:absolute; overflow:hidden; z-index:0; }
 .supplied-film-mask { display:block; left:0; right:0; top:0; height:24.39%; }
 .film-track { height:100%; display:flex; width:max-content; gap:10px; padding:1.1% 0; will-change:transform; }
-.supplied-film-mask .film-track { position:relative; gap:0; padding:0; margin-left:calc(50% - max(14.5vw,195px)); background:#bd7180; }
+.supplied-film-mask .film-track { position:relative; gap:0; padding:0; margin-left:calc(50% - max(14.5vw,195px)); background:#0a0a0b; }
 .film-frame { width:29vw; min-width:390px; height:100%; flex:none; position:relative; overflow:hidden; border:0; outline:2px solid transparent; outline-offset:-2px; box-shadow:none; background:#151519; transition:outline-color .15s ease; }
 .gallery-frame:hover { outline-color:#4a4c52; }
-.supplied-film-mask .film-frame { height:100%; align-self:flex-start; }
+.supplied-film-mask .film-frame { height:82%; align-self:center; }
 .gallery-frame-media { display:block; width:100%; height:100%; object-fit:cover; background:#0a0a0d; }
 .gallery-frame.is-portrait .gallery-frame-media { object-fit:contain; }
 .gallery-frame-number { position:absolute; z-index:6; right:12px; bottom:10px; color:rgba(255,255,255,.72); font-size:clamp(9px,.66vw,12px); font-weight:600; letter-spacing:.12em; line-height:1; text-shadow:0 1px 8px rgba(0,0,0,.8); pointer-events:none; }

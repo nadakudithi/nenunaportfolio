@@ -1360,7 +1360,7 @@ function Gallery() {
         .to(".gallery-work-chrome", { opacity: 0, y: 16, pointerEvents: "none", duration: .35 }, 0)
         .to(transitionUi.current, { opacity: 0, xPercent: 100, duration: .72 }, .08)
         .to(cassetteCanvas.current, { xPercent: 0, duration: .72 }, .08)
-        .set(visual.current, { backgroundColor: "#fff" }, .8)
+        .set(visual.current, { backgroundColor: "#edebe6" }, .8)
         .to(visual.current, { x: 0, y: 0, scale: 1, borderRadius: 0, duration: 1.15 }, .8)
         .to(phoneReveal.current, { opacity: 0, duration: .35, ease: "power2.out" }, 1.55);
     };
@@ -1558,7 +1558,7 @@ function Gallery() {
         }
       })
         .to(track.current, { x: () => -(track.current.querySelector(".film-frame")?.offsetWidth || 0) * (galleryItems.length - 1), duration: 3, ease: "none" }, 0)
-        .to(".moving-perforations i", { backgroundPositionX: "-50vw", duration: 3, ease: "none" }, 0)
+        .to(".moving-perforations i", { backgroundPositionX: "-200vw", duration: 3, ease: "none" }, 0)
         .to(".svg-reel-left", { rotation: 960, duration: 3, ease: "none" }, 0)
         .to(".svg-reel-right", { rotation: -960, duration: 3, ease: "none" }, 0)
         .to({}, { duration: 1 });
