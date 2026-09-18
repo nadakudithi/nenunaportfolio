@@ -216,7 +216,9 @@ function NavRail() {
     const updateRailMode = (scrollY) => {
       const gallery = ScrollTrigger.getById("gallery-scrub");
       const workStart = gallery ? gallery.start + (gallery.end - gallery.start) * .74 : 0;
-      const nextHorizontal = Boolean(gallery && scrollY >= gallery.start && scrollY < workStart - 4);
+      const galleryScene = document.getElementById("gallery");
+      const workOwnsPinnedScene = galleryScene?.classList.contains("is-work-mode");
+      const nextHorizontal = Boolean(gallery && !workOwnsPinnedScene && scrollY >= gallery.start && scrollY < workStart - 4);
       if (nextHorizontal === horizontal) return;
       horizontal = nextHorizontal;
       rail.classList.toggle("is-gallery", horizontal);
@@ -245,10 +247,21 @@ function NavRail() {
       const y = targetY(section.id);
       setHandlePosition(section.pos, true);
       jumpTween = gsap.to(window, {
-        scrollTo: y,
+        // Keep section-owned wheel observers from cancelling a rail jump while
+        // Gallery's pinned scrub is correcting the page position.
+        scrollTo: { y, autoKill: false },
         duration,
         ease: "power3.inOut",
         overwrite: true,
+        onInterrupt: () => {
+          jumpTween = null;
+          jumping.current = false;
+          currentProgress = pageYToRailPosition(window.scrollY);
+          updateRailMode(window.scrollY);
+          setHandlePosition(currentProgress);
+          updateActiveStop(currentProgress);
+          window.dispatchEvent(new Event("nav-rail-jump-ready"));
+        },
         onComplete: () => {
           jumpTween = null;
           jumping.current = false;
@@ -257,7 +270,15 @@ function NavRail() {
           setHandlePosition(currentProgress);
           updateActiveStop(currentProgress);
           rebuildPositions();
-          if (section.id === "work") window.dispatchEvent(new Event("nav-open-work"));
+          if (section.id === "work") {
+            window.dispatchEvent(new Event("nav-open-work"));
+            // Work reuses Gallery's pinned scroll range, so its scrollY can
+            // still satisfy the Gallery threshold after the visual ownership
+            // has changed. Work always uses the vertical-left rail.
+            horizontal = false;
+            rail.classList.remove("is-gallery");
+            setHandlePosition(currentProgress);
+          }
           if (section.id === "gallery") window.dispatchEvent(new Event("nav-open-gallery"));
           if (section.id === "about") window.dispatchEvent(new Event("show-life-outside"));
           window.dispatchEvent(new CustomEvent("nav-rail-arrive", { detail: { section: section.id } }));
@@ -385,11 +406,15 @@ function NavRail() {
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           currentProgress = pageYToRailPosition(self.scroll());
-          if (!dragging.current && !jumping.current) {
-            updateRailMode(self.scroll());
-            setHandlePosition(currentProgress);
-            updateActiveStop(currentProgress);
-          }
+          if (dragging.current) return;
+          // Programmatic jumps still cross Gallery's orientation boundary,
+          // so keep that in sync. But the handle itself is already being
+          // animated to its target by the jump's own tween — setting it here
+          // too (ungated) fights that tween and makes the handle jitter.
+          updateRailMode(self.scroll());
+          if (jumping.current) return;
+          setHandlePosition(currentProgress);
+          updateActiveStop(currentProgress);
         }
       });
       rebuildPositions();
@@ -1370,17 +1395,13 @@ function Gallery() {
       const fromY = event.detail?.fromY ?? window.scrollY;
       if (destination === "work") {
         returningFromAbout = fromY > workY && transitioning;
-      } else if (destination === "top" || destination === "intro" || destination === "gallery") {
+      } else {
+        // Any jump away from Work that isn't a rail landing on "work" itself
+        // must fully clear is-work-mode/transitioning. Otherwise those flags
+        // stay stuck true, and a later rail jump back to "work" mistakes the
+        // fresh landing for a reverse About handoff with no clone to replay.
         resetTransition();
         railJumping = true;
-      } else {
-        returningFromAbout = false;
-        if (destination === "about" || destination === "contact") {
-          projectObserver.disable();
-          stateTimeline?.kill();
-          gsap.killTweensOf(".gallery-work-chrome");
-          gsap.set(".gallery-work-chrome", { opacity: 0, y: 0, pointerEvents: "none" });
-        }
       }
     };
     const releaseFromRailJump = () => { railJumping = false; };
